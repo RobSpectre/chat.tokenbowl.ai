@@ -35,7 +35,5 @@ export default defineConfig({
     }
   },
   // For GitHub Pages deployment
-  // If deploying to https://username.github.io/repository-name/, set base to '/repository-name/'
-  // If deploying to https://username.github.io/, leave base as '/'
-  base: process.env.GITHUB_PAGES_BASE || '/'
+  base: '/chat.tokenbowl.ai/'
 })
