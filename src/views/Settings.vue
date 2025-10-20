@@ -209,32 +209,91 @@
               .text-red-500.text-sm(v-if="botCreateError") {{ botCreateError }}
 
             //- Bots List
-            .space-y-2(v-if="userBots.length > 0")
-              h3.text-sm.font-semibold.text-white My Bots
-              .bg-slate-800.p-3.rounded-lg.border.border-slate-700(
-                v-for="bot in userBots"
-                :key="bot.username"
-              )
-                .flex.items-center.justify-between
-                  .flex.items-center.space-x-3
-                    .w-10.h-10.flex.items-center.justify-center.bg-slate-700.rounded
-                      img(
-                        v-if="bot.logo"
-                        :src="`${apiBaseUrl}/public/images/${bot.logo}`"
-                        :alt="bot.username"
-                        class="w-full h-full object-contain"
-                      )
-                      span(v-else-if="bot.emoji") {{ bot.emoji }}
-                      span.text-sm.text-gray-300(v-else) 🤖
+            div(v-if="userBots.length > 0")
+              h3.text-sm.font-semibold.text-white.mb-2 My Bots ({{ userBots.length }})
+              .space-y-3.mb-3
+                .bg-slate-800.p-4.rounded-lg.border.border-slate-700(
+                  v-for="bot in userBots"
+                  :key="bot.id"
+                )
+                  .flex.items-start.justify-between.mb-3
+                    .flex.items-start.space-x-3.flex-1
+                      .w-12.h-12.flex.items-center.justify-center.bg-slate-700.rounded.flex-shrink-0
+                        img(
+                          v-if="bot.logo"
+                          :src="`${apiBaseUrl}/public/images/${bot.logo}`"
+                          :alt="bot.username"
+                          class="w-full h-full object-contain"
+                        )
+                        span.text-xl(v-else-if="bot.emoji") {{ bot.emoji }}
+                        span.text-lg.text-gray-300(v-else) 🤖
+                      div.flex-1
+                        .flex.items-center.gap-2.mb-1
+                          p.text-base.font-medium.text-white {{ bot.username }}
+                          span.text-xs.bg-purple-600.text-white.rounded.px-2(style="padding-top: 2px; padding-bottom: 2px") BOT
+                          span.text-xs.bg-blue-600.text-white.rounded.px-2(v-if="bot.admin" style="padding-top: 2px; padding-bottom: 2px") ADMIN
+                        p.text-xs.text-gray-400 Created: {{ formatDate(bot.created_at) }}
+                    button.btn.btn-secondary.text-red-400.text-sm.px-3.py-1(
+                      @click="handleDeleteBot(bot.id)"
+                      :disabled="deletingBot === bot.id"
+                      class="hover:bg-red-900"
+                    ) {{ deletingBot === bot.id ? 'Deleting...' : 'Delete' }}
+
+                  .space-y-2.mt-3.pt-3.border-t.border-slate-700
+                    div(v-if="bot.id")
+                      p.text-xs.text-gray-400.mb-1 Bot ID
+                      p.text-xs.text-gray-300.font-mono.break-all {{ bot.id }}
+
+                    div(v-if="bot.api_key")
+                      p.text-xs.text-gray-400.mb-1 API Key
+                      .flex.gap-2
+                        input.input.flex-1.text-xs.font-mono(
+                          :type="showBotApiKey[bot.id] ? 'text' : 'password'"
+                          :value="bot.api_key"
+                          readonly
+                        )
+                        button.btn.btn-secondary.text-xs.px-2.py-1(@click="toggleBotApiKey(bot.id)") {{ showBotApiKey[bot.id] ? 'Hide' : 'Show' }}
+                        button.btn.btn-secondary.text-xs.px-2.py-1(@click="copyBotApiKey(bot.api_key, bot.id)") {{ copiedBotApiKey[bot.id] ? 'Copied!' : 'Copy' }}
+
                     div
-                      p.text-sm.font-medium.text-white {{ bot.username }}
-                      p.text-xs.text-gray-400.font-mono(v-if="bot.webhook_url") {{ bot.webhook_url }}
-                      p.text-xs.text-gray-500(v-else) No webhook configured
-                  button.btn.btn-secondary.text-red-400.text-sm.px-3.py-1(
-                    @click="handleDeleteBot(bot.username)"
-                    :disabled="deletingBot === bot.username"
-                    class="hover:bg-red-900"
-                  ) {{ deletingBot === bot.username ? 'Deleting...' : 'Delete' }}
+                      p.text-xs.text-gray-400.mb-1 Webhook URL
+                      div(v-if="editingBotWebhook[bot.id]")
+                        input.input.w-full.text-xs.mb-2(
+                          v-model="botWebhookEdit[bot.id]"
+                          type="url"
+                          placeholder="https://your-webhook-url.com"
+                          @keyup.enter="saveBotWebhook(bot.id)"
+                          @keyup.esc="cancelBotWebhookEdit(bot.id)"
+                        )
+                        .flex.gap-2
+                          button.btn.btn-secondary.text-xs.px-2.py-1(@click="cancelBotWebhookEdit(bot.id)") Cancel
+                          button.btn.btn-primary.text-xs.px-2.py-1(
+                            @click="saveBotWebhook(bot.id)"
+                            :disabled="updatingBotWebhook[bot.id]"
+                          ) {{ updatingBotWebhook[bot.id] ? 'Saving...' : 'Save' }}
+                      div(v-else)
+                        .relative.group
+                          input.input.w-full.text-xs.font-mono.cursor-pointer(
+                            :value="bot.webhook_url || 'Click to add webhook URL'"
+                            @click="startEditingBotWebhook(bot.id, bot.webhook_url)"
+                            readonly
+                            :class="bot.webhook_url ? 'text-gray-300' : 'text-gray-500 italic'"
+                          )
+                          .absolute.right-2.top-1.text-xs.text-gray-400.opacity-0.transition-opacity(
+                            class="group-hover:opacity-100"
+                          ) ✎
+
+                    div(v-if="bot.email")
+                      p.text-xs.text-gray-400.mb-1 Email
+                      p.text-xs.text-gray-300 {{ bot.email }}
+
+                    div(v-if="!bot.api_key")
+                      .bg-yellow-900.bg-opacity-20.border.border-yellow-700.rounded.p-2.mt-2
+                        .flex.items-start.gap-1
+                          svg.w-3.h-3.flex-shrink-0(fill="currentColor" viewBox="0 0 20 20" style="margin-top: 2px")
+                            path(fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd")
+                          p.text-xs.text-yellow-400 API key not available. Keys are only shown during bot creation.
+
               .text-red-500.text-sm(v-if="botDeleteError") {{ botDeleteError }}
 </template>
 
@@ -264,6 +323,11 @@ export default {
     const apiBaseUrl = import.meta.env.VITE_TOKEN_BOWL_CHAT_API_URL || 'http://localhost:8000'
     const showApiKey = ref(false)
     const apiKeyCopied = ref(false)
+    const showBotApiKey = ref({})
+    const copiedBotApiKey = ref({})
+    const editingBotWebhook = ref({})
+    const botWebhookEdit = ref({})
+    const updatingBotWebhook = ref({})
     const logoUpdateSuccess = ref(false)
     const logoUpdateError = ref('')
     const cardOpacity = ref(1)
@@ -305,7 +369,10 @@ export default {
         // For now, we'll show all bots. In production, you'd want to filter by creator/owner
         userBots.value = allUsers.filter(user => user.bot === true)
       } catch (err) {
-        console.error('Failed to load bots:', err)
+        // Silently fail if backend is unavailable - bots section will remain empty
+        if (err.code !== 'ERR_NETWORK') {
+          console.warn('Failed to load bots:', err.message)
+        }
       }
     }
 
@@ -521,12 +588,19 @@ export default {
       }
     }
 
-    const handleDeleteBot = async (username) => {
-      deletingBot.value = username
+    const handleDeleteBot = async (botId) => {
+      const bot = userBots.value.find(b => b.id === botId)
+      const botName = bot?.username || botId
+
+      if (!confirm(`Are you sure you want to delete bot "${botName}"? This action cannot be undone.`)) {
+        return
+      }
+
+      deletingBot.value = botId
       botDeleteError.value = ''
 
       try {
-        await apiClient.deleteUser(username)
+        await apiClient.deleteUser(botId)
 
         // Reload bots list
         await loadUserBots()
@@ -537,6 +611,72 @@ export default {
       }
     }
 
+    const formatDate = (dateString) => {
+      if (!dateString) return '-'
+      const date = new Date(dateString)
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      })
+    }
+
+    const toggleBotApiKey = (botId) => {
+      showBotApiKey.value[botId] = !showBotApiKey.value[botId]
+    }
+
+    const copyBotApiKey = async (apiKey, botId) => {
+      try {
+        await navigator.clipboard.writeText(apiKey)
+        copiedBotApiKey.value[botId] = true
+
+        setTimeout(() => {
+          copiedBotApiKey.value[botId] = false
+        }, 2000)
+      } catch (err) {
+        console.error('Failed to copy bot API key:', err)
+      }
+    }
+
+    const startEditingBotWebhook = (botId, currentWebhook) => {
+      editingBotWebhook.value[botId] = true
+      botWebhookEdit.value[botId] = currentWebhook || ''
+    }
+
+    const cancelBotWebhookEdit = (botId) => {
+      editingBotWebhook.value[botId] = false
+      botWebhookEdit.value[botId] = ''
+    }
+
+    const saveBotWebhook = async (botId) => {
+      updatingBotWebhook.value[botId] = true
+
+      try {
+        const webhookUrl = botWebhookEdit.value[botId]?.trim() || null
+
+        await apiClient.updateUserAdmin(botId, {
+          webhook_url: webhookUrl
+        })
+
+        // Update the local bot data
+        const bot = userBots.value.find(b => b.id === botId)
+        if (bot) {
+          bot.webhook_url = webhookUrl
+        }
+
+        // Exit edit mode
+        editingBotWebhook.value[botId] = false
+        botWebhookEdit.value[botId] = ''
+      } catch (err) {
+        console.error('Failed to update bot webhook:', err)
+        alert(err.response?.data?.detail || 'Failed to update webhook')
+      } finally {
+        updatingBotWebhook.value[botId] = false
+      }
+    }
+
     return {
       apiBaseUrl,
       currentUser,
@@ -544,6 +684,11 @@ export default {
       availableLogos,
       showApiKey,
       apiKeyCopied,
+      showBotApiKey,
+      copiedBotApiKey,
+      editingBotWebhook,
+      botWebhookEdit,
+      updatingBotWebhook,
       logoUpdateSuccess,
       logoUpdateError,
       cardOpacity,
@@ -587,7 +732,13 @@ export default {
       deletingBot,
       botDeleteError,
       handleCreateBot,
-      handleDeleteBot
+      handleDeleteBot,
+      formatDate,
+      toggleBotApiKey,
+      copyBotApiKey,
+      startEditingBotWebhook,
+      cancelBotWebhookEdit,
+      saveBotWebhook
     }
   }
 }

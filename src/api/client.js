@@ -2,11 +2,23 @@ import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_TOKEN_BOWL_CHAT_API_URL || 'http://localhost:8000'
 
-// Function to get auth - always use localStorage to avoid circular dependency and require() issues
+// Function to get auth - reads from Pinia persisted state to avoid circular dependency issues
 const getAuth = () => {
+  try {
+    const authState = localStorage.getItem('auth')
+    if (authState) {
+      const parsed = JSON.parse(authState)
+      return {
+        apiKey: parsed.apiKey,
+        sessionToken: parsed.sessionToken
+      }
+    }
+  } catch (error) {
+    console.error('Failed to parse auth state:', error)
+  }
   return {
-    apiKey: localStorage.getItem('apiKey'),
-    sessionToken: localStorage.getItem('sessionToken')
+    apiKey: null,
+    sessionToken: null
   }
 }
 
@@ -32,6 +44,23 @@ class ApiClient {
 
       return config
     })
+
+    // Add response interceptor to handle 401 errors
+    this.client.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 401) {
+          // Clear auth state from localStorage
+          localStorage.removeItem('auth')
+
+          // Redirect to login page
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login'
+          }
+        }
+        return Promise.reject(error)
+      }
+    )
   }
 
   // Auth endpoints
@@ -46,12 +75,11 @@ class ApiClient {
   }
 
   async createBot(username, webhookUrl = null, logo = null, emoji = null) {
-    const response = await this.client.post('/register', {
+    const response = await this.client.post('/bots', {
       username,
       webhook_url: webhookUrl,
       logo,
-      emoji,
-      bot: true
+      emoji
     })
     return response.data
   }

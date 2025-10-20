@@ -45,7 +45,7 @@ export default {
   name: 'LoginApiKey',
   setup() {
     const router = useRouter()
-    const { login } = useAuth()
+    const { login, fetchCurrentUser } = useAuth()
 
     const apiKey = ref('')
     const loading = ref(false)
@@ -68,15 +68,11 @@ export default {
         // Temporarily set API key for the API client to use
         const tempApiKey = apiKey.value
 
-        // Fetch current user to validate API key (will use our getAuth helper)
+        // Set API key first so the next call can authenticate
         await login({ api_key: tempApiKey })
-        const user = await apiClient.getCurrentUser()
 
-        // Update login with full user data
-        login({
-          ...user,
-          api_key: tempApiKey
-        })
+        // Fetch fresh user data to get admin status and other fields
+        await fetchCurrentUser()
 
         // Redirect to chat
         router.push('/chat')

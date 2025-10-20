@@ -40,10 +40,11 @@ header.bg-gradient-to-r.from-slate-900.via-slate-800.to-slate-900.border-b-4.bor
 
 <script>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
+import { useUnreadStore } from '../stores'
 import { EnvelopeIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, ShieldCheckIcon } from '@heroicons/vue/24/outline'
-import apiClient from '../api/client'
 
 export default {
   name: 'TopNav',
@@ -69,8 +70,9 @@ export default {
   },
   setup() {
     const router = useRouter()
-    const { logout, currentUser } = useAuth()
-    const unreadDirectMessages = ref(0)
+    const { logout, currentUser, fetchCurrentUser } = useAuth()
+    const unreadStore = useUnreadStore()
+    const { unreadDirectMessages } = storeToRefs(unreadStore)
     let unreadPollInterval = null
 
     const handleLogout = () => {
@@ -78,21 +80,19 @@ export default {
       router.push('/login')
     }
 
-    const fetchUnreadCount = async () => {
-      try {
-        const response = await apiClient.getUnreadCount()
-        unreadDirectMessages.value = response.unread_direct_messages
-      } catch (error) {
-        console.error('Failed to fetch unread count:', error)
-      }
-    }
-
     onMounted(() => {
       // Fetch unread count immediately
-      fetchUnreadCount()
+      unreadStore.fetchUnreadCount()
 
       // Poll for unread count every 30 seconds
-      unreadPollInterval = setInterval(fetchUnreadCount, 30000)
+      unreadPollInterval = setInterval(() => unreadStore.fetchUnreadCount(), 30000)
+
+      // Refresh user data on route change to pick up admin status changes
+      router.afterEach(() => {
+        fetchCurrentUser().catch(err => {
+          console.error('Failed to refresh user data:', err)
+        })
+      })
     })
 
     onUnmounted(() => {

@@ -27,7 +27,7 @@ export default {
   setup() {
     const router = useRouter()
     const route = useRoute()
-    const { login } = useAuth()
+    const { login, fetchCurrentUser } = useAuth()
 
     const loading = ref(true)
     const error = ref('')
@@ -53,6 +53,9 @@ export default {
           api_key: response.api_key,
           session_token: response.session_token
         })
+
+        // Fetch fresh user data to get admin status and other fields
+        await fetchCurrentUser()
 
         success.value = true
 

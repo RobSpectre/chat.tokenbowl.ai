@@ -94,6 +94,12 @@ export const useMessagesStore = defineStore('messages', {
     },
 
     async addPublicMessage(message) {
+      // Skip messages with missing critical fields
+      if (!message || !message.from_username || message.content === undefined) {
+        console.warn('Skipping message with missing fields:', message)
+        return
+      }
+
       // Check if this is a real message that matches a temporary optimistic message
       if (message.id && !message.id.toString().startsWith('temp-')) {
         // Look for a matching temp message (same content and username)
@@ -104,8 +110,8 @@ export const useMessagesStore = defineStore('messages', {
         )
 
         if (tempMsgIndex !== -1) {
-          // Replace the temp message with the real one
-          this.publicMessages[tempMsgIndex] = message
+          // Replace the temp message with the real one using splice for proper reactivity
+          this.publicMessages.splice(tempMsgIndex, 1, message)
         } else if (!this.publicMessages.find(m => m.id === message.id)) {
           // No temp message found, add as new message
           this.publicMessages.push(message)

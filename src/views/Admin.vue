@@ -14,7 +14,7 @@
       //- Admin Content
       .space-y-6(v-else)
         //- Stats
-        .grid.grid-cols-3.gap-4
+        .grid.grid-cols-1.sm_grid-cols-2.lg_grid-cols-3.gap-4
           .card
             p.text-sm.text-gray-400 Total Users
             p.text-2xl.font-bold.text-white {{ allUsers.length }}
@@ -58,20 +58,71 @@
                 )
 
             .flex.justify-end
-              button.btn.btn-primary(
+              button.btn.btn-primary.w-full.sm_w-auto(
                 type="submit"
                 :disabled="inviting"
               ) {{ inviting ? 'Sending Invite...' : 'Send Invite' }}
 
+        //- Create Bot Form
+        .card
+          h2.text-xl.font-semibold.text-white.mb-4 Create Bot
+
+          .text-red-500.text-sm.mb-4(v-if="botError") {{ botError }}
+          .text-green-500.text-sm.mb-4(v-if="botSuccess") {{ botSuccess }}
+
+          form.space-y-4(@submit.prevent="handleCreateBot")
+            .grid.grid-cols-1.md_grid-cols-2.gap-4
+              div
+                label.text-sm.text-gray-400.block.mb-2 Bot Username
+                input.input.w-full(
+                  v-model="botForm.username"
+                  type="text"
+                  placeholder="my-bot"
+                  required
+                )
+              div
+                label.text-sm.text-gray-400.block.mb-2 Webhook URL
+                input.input.w-full(
+                  v-model="botForm.webhookUrl"
+                  type="url"
+                  placeholder="https://your-bot-endpoint.com/webhook"
+                )
+
+            .grid.grid-cols-1.md_grid-cols-2.gap-4
+              div
+                label.text-sm.text-gray-400.block.mb-2 Logo
+                select.input.w-full(v-model="botForm.logo")
+                  option(:value="null") No logo
+                  option(
+                    v-for="logo in availableLogos"
+                    :key="logo"
+                    :value="logo"
+                  ) {{ logo }}
+              div
+                label.text-sm.text-gray-400.block.mb-2 Emoji
+                input.input.w-full(
+                  v-model="botForm.emoji"
+                  type="text"
+                  placeholder="🤖"
+                  maxlength="2"
+                )
+
+            .flex.justify-end
+              button.btn.btn-primary.w-full.sm_w-auto(
+                type="submit"
+                :disabled="creatingBot"
+              ) {{ creatingBot ? 'Creating Bot...' : 'Create Bot' }}
+
         //- User List
         .card
-          .flex.items-center.justify-between.mb-4
+          .flex.flex-col.sm_flex-row.items-start.sm_items-center.justify-between.mb-4.gap-3
             h2.text-xl.font-semibold.text-white All Users
-            button.btn.btn-primary(@click="loadUsers" :disabled="loading") {{ loading ? 'Refreshing...' : 'Refresh' }}
+            button.btn.btn-primary.w-full.sm_w-auto(@click="loadUsers" :disabled="loading") {{ loading ? 'Refreshing...' : 'Refresh' }}
 
           .text-red-500.text-sm.mb-4(v-if="error") {{ error }}
 
-          .overflow-x-auto
+          //- Desktop Table View (hidden on mobile)
+          .hidden.lg_block.overflow-x-auto
             table.w-full
               thead
                 tr.border-b.border-slate-700
@@ -143,6 +194,55 @@
                         class="hover:bg-red-900"
                       ) {{ deleting === user.id ? '...' : 'Delete' }}
 
+          //- Mobile Card View (shown on mobile/tablet)
+          .lg_hidden.space-y-3
+            .bg-slate-800.rounded-lg.p-4.border.border-slate-700(
+              v-for="user in sortedUsers"
+              :key="user.id"
+            )
+              .flex.items-start.justify-between.mb-3
+                .flex.items-center.space-x-3
+                  .w-12.h-12.flex.items-center.justify-center.bg-slate-700.rounded.flex-shrink-0
+                    img(
+                      v-if="user.logo"
+                      :src="`${apiBaseUrl}/public/images/${user.logo}`"
+                      :alt="user.username"
+                      class="w-full h-full object-contain"
+                    )
+                    span.text-xl(v-else-if="user.emoji") {{ user.emoji }}
+                    span.text-gray-300(v-else) {{ user.username?.[0]?.toUpperCase() }}
+                  div
+                    p.font-medium.text-white {{ user.username }}
+                    .flex.flex-wrap.items-center.gap-1.mt-1
+                      .text-xs.bg-purple-600.text-white.rounded(v-if="user.bot" class="px-2 py-0.5") BOT
+                      .text-xs.bg-blue-600.text-white.rounded(v-if="user.admin" class="px-2 py-0.5") ADMIN
+                      .text-xs.bg-gray-600.text-white.rounded(v-if="user.viewer" class="px-2 py-0.5") VIEWER
+
+              .space-y-2.text-sm
+                div(v-if="user.email")
+                  p.text-gray-400 Email
+                  p.text-gray-300 {{ user.email }}
+                div
+                  p.text-gray-400 ID
+                  p.text-xs.text-gray-300.font-mono.break-all {{ user.id }}
+                div(v-if="user.webhook_url")
+                  p.text-gray-400 Webhook
+                  p.text-xs.text-gray-300.font-mono.break-all {{ user.webhook_url }}
+                div
+                  p.text-gray-400 Created
+                  p.text-gray-300 {{ formatDate(user.created_at) }}
+
+              .flex.gap-2.mt-4
+                button.btn.btn-secondary.text-sm.flex-1(
+                  @click="startEditUser(user)"
+                  :disabled="deleting === user.id"
+                ) Edit
+                button.btn.btn-secondary.text-red-400.text-sm.flex-1(
+                  @click="handleDeleteUser(user.id)"
+                  :disabled="deleting === user.id || user.id === currentUser?.id"
+                  class="hover:bg-red-900"
+                ) {{ deleting === user.id ? '...' : 'Delete' }}
+
         //- Edit User Modal
         .fixed.inset-0.bg-black.bg-opacity-50.flex.items-center.justify-center.z-50(
           v-if="editingUser"
@@ -166,7 +266,7 @@
                 )
                 p.text-xs.text-gray-500.mt-1 Changing username will update the user's identifier across the system
 
-              .grid.grid-cols-2.gap-4
+              .grid.grid-cols-1.sm_grid-cols-2.gap-4
                 div
                   label.text-sm.text-gray-400 Email
                   input.input.w-full(
@@ -182,7 +282,7 @@
                     placeholder="https://..."
                   )
 
-              .grid.grid-cols-2.gap-4
+              .grid.grid-cols-1.sm_grid-cols-2.gap-4
                 div
                   label.text-sm.text-gray-400 Logo
                   select.input.w-full(v-model="editForm.logo")
@@ -201,14 +301,16 @@
                     maxlength="2"
                   )
 
-              .grid.grid-cols-3.gap-4
-                label.flex.items-center.space-x-2.cursor-pointer
+              .grid.grid-cols-1.sm_grid-cols-3.gap-4
+                label.flex.items-center.space-x-2(:class="selectedUser?.bot ? 'opacity-50' : 'cursor-pointer'")
                   input(
                     type="checkbox"
                     v-model="editForm.bot"
                     class="w-4 h-4"
+                    disabled
                   )
                   span.text-sm.text-gray-300 Bot
+                  span.text-xs.text-gray-500(v-if="selectedUser?.bot") (read-only)
                 label.flex.items-center.space-x-2.cursor-pointer
                   input(
                     type="checkbox"
@@ -224,12 +326,12 @@
                   )
                   span.text-sm.text-gray-300 Viewer
 
-              .flex.justify-end.gap-3.mt-6
-                button.btn.btn-secondary(
+              .flex.flex-col.sm_flex-row.justify-end.gap-3.mt-6
+                button.btn.btn-secondary.w-full.sm_w-auto(
                   type="button"
                   @click="cancelEdit"
                 ) Cancel
-                button.btn.btn-primary(
+                button.btn.btn-primary.w-full.sm_w-auto(
                   type="submit"
                   :disabled="updating"
                 ) {{ updating ? 'Updating...' : 'Update User' }}
@@ -283,6 +385,17 @@ export default {
     const inviting = ref(false)
     const inviteError = ref('')
     const inviteSuccess = ref('')
+
+    // Bot form state
+    const botForm = ref({
+      username: '',
+      webhookUrl: null,
+      logo: null,
+      emoji: null
+    })
+    const creatingBot = ref(false)
+    const botError = ref('')
+    const botSuccess = ref('')
 
     const sortedUsers = computed(() => {
       return [...allUsers.value].sort((a, b) => {
@@ -368,9 +481,8 @@ export default {
         if (editForm.value.emoji !== selectedUser.value.emoji) {
           payload.emoji = editForm.value.emoji || null
         }
-        if (editForm.value.bot !== selectedUser.value.bot) {
-          payload.bot = editForm.value.bot
-        }
+        // Don't allow changing bot status - it's read-only
+        // Bots must be created via POST /bots
         if (editForm.value.admin !== selectedUser.value.admin) {
           payload.admin = editForm.value.admin
         }
@@ -461,6 +573,41 @@ export default {
       }
     }
 
+    const handleCreateBot = async () => {
+      creatingBot.value = true
+      botError.value = ''
+      botSuccess.value = ''
+
+      try {
+        const response = await apiClient.createBot(
+          botForm.value.username,
+          botForm.value.webhookUrl,
+          botForm.value.logo,
+          botForm.value.emoji
+        )
+
+        botSuccess.value = `Bot "${botForm.value.username}" created successfully! API Key: ${response.api_key}`
+
+        // Reset form after successful creation
+        botForm.value.username = ''
+        botForm.value.webhookUrl = null
+        botForm.value.logo = null
+        botForm.value.emoji = null
+
+        // Reload users list to show the new bot
+        await loadUsers()
+
+        // Clear success message after 10 seconds (longer for API key)
+        setTimeout(() => {
+          botSuccess.value = ''
+        }, 10000)
+      } catch (err) {
+        botError.value = err.response?.data?.detail || 'Failed to create bot'
+      } finally {
+        creatingBot.value = false
+      }
+    }
+
     onMounted(async () => {
       await loadUsers()
       await usersStore.loadAvailableLogos()
@@ -485,12 +632,17 @@ export default {
       inviting,
       inviteError,
       inviteSuccess,
+      botForm,
+      creatingBot,
+      botError,
+      botSuccess,
       loadUsers,
       startEditUser,
       cancelEdit,
       handleUpdateUser,
       handleDeleteUser,
       handleInviteUser,
+      handleCreateBot,
       formatDate
     }
   }

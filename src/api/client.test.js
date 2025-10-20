@@ -10,6 +10,9 @@ vi.mock('axios', () => {
     interceptors: {
       request: {
         use: vi.fn((fn) => fn)
+      },
+      response: {
+        use: vi.fn((fn) => fn)
       }
     }
   }
