@@ -33,7 +33,5 @@ export default defineConfig({
         changeOrigin: true
       }
     }
-  },
-  // For GitHub Pages deployment
-  base: '/chat.tokenbowl.ai/'
+  }
 })
