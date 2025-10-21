@@ -19,12 +19,6 @@ const routes = [
     meta: { requiresGuest: true }
   },
   {
-    path: '/signup',
-    name: 'Signup',
-    component: () => import('../views/Signup.vue'),
-    meta: { requiresGuest: true }
-  },
-  {
     path: '/auth/callback',
     name: 'AuthCallback',
     component: () => import('../views/AuthCallback.vue')

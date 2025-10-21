@@ -49,11 +49,11 @@
                   option(value="viewer") Viewer
                   option(value="admin") Admin
               div
-                label.text-sm.text-gray-400.block.mb-2 Signup URL
+                label.text-sm.text-gray-400.block.mb-2 Redirect URL
                 input.input.w-full(
                   v-model="inviteForm.signupUrl"
                   type="url"
-                  placeholder="https://chat.tokenbowl.ai/signup"
+                  placeholder="https://chat.tokenbowl.ai"
                   required
                 )
 
@@ -380,7 +380,7 @@ export default {
     const inviteForm = ref({
       email: '',
       role: 'member',
-      signupUrl: window.location.origin + '/signup'
+      signupUrl: window.location.origin
     })
     const inviting = ref(false)
     const inviteError = ref('')
@@ -560,7 +560,7 @@ export default {
         // Reset form after successful invite
         inviteForm.value.email = ''
         inviteForm.value.role = 'member'
-        inviteForm.value.signupUrl = window.location.origin + '/signup'
+        inviteForm.value.signupUrl = window.location.origin
 
         // Clear success message after 5 seconds
         setTimeout(() => {

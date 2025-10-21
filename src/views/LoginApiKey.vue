@@ -30,8 +30,7 @@
         router-link.text-blue-400.font-medium.text-sm(to="/login" class="hover:text-blue-300") Use Email
 
     .text-center.mt-6
-      p.text-gray-400 Don't have an account?
-      router-link.text-blue-400.font-medium(to="/signup" class="hover:text-blue-300") Sign up here
+      p.text-gray-400.text-sm Don't have an account? Contact an administrator for an invitation.
 </template>
 
 <script>
