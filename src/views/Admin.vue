@@ -48,14 +48,6 @@
                   option(value="member") Member
                   option(value="viewer") Viewer
                   option(value="admin") Admin
-              div
-                label.text-sm.text-gray-400.block.mb-2 Redirect URL
-                input.input.w-full(
-                  v-model="inviteForm.signupUrl"
-                  type="url"
-                  placeholder="https://chat.tokenbowl.ai"
-                  required
-                )
 
             .flex.justify-end
               button.btn.btn-primary.w-full.sm_w-auto(
@@ -379,8 +371,7 @@ export default {
     // Invite form state
     const inviteForm = ref({
       email: '',
-      role: 'member',
-      signupUrl: window.location.origin
+      role: 'member'
     })
     const inviting = ref(false)
     const inviteError = ref('')
@@ -549,10 +540,13 @@ export default {
       inviteSuccess.value = ''
 
       try {
+        // Automatically construct the redirect URL
+        const redirectUrl = window.location.origin + '/auth/callback'
+
         const response = await apiClient.inviteUserByEmail(
           inviteForm.value.email,
           inviteForm.value.role,
-          inviteForm.value.signupUrl
+          redirectUrl
         )
 
         inviteSuccess.value = response.message || `Invitation sent to ${inviteForm.value.email}`
@@ -560,7 +554,6 @@ export default {
         // Reset form after successful invite
         inviteForm.value.email = ''
         inviteForm.value.role = 'member'
-        inviteForm.value.signupUrl = window.location.origin
 
         // Clear success message after 5 seconds
         setTimeout(() => {

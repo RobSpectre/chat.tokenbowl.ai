@@ -70,11 +70,6 @@ describe('Admin.vue - Invite Functionality', () => {
       // Check for role select
       const roleSelect = wrapper.find('select')
       expect(roleSelect.exists()).toBe(true)
-
-      // Check for signup URL input
-      const urlInput = wrapper.find('input[type="url"]')
-      expect(urlInput.exists()).toBe(true)
-      expect(urlInput.attributes('placeholder')).toContain('tokenbowl.ai')
     })
 
     it('should have correct role options', async () => {
@@ -92,14 +87,6 @@ describe('Admin.vue - Invite Functionality', () => {
       expect(options[2].text()).toBe('Admin')
       expect(options[2].element.value).toBe('admin')
     })
-
-    it('should have default redirect URL pre-filled', async () => {
-      wrapper = createWrapper()
-      await flushPromises()
-
-      const urlInput = wrapper.find('input[type="url"]')
-      expect(urlInput.element.value).toBe(window.location.origin)
-    })
   })
 
   describe('Invite Form Submission', () => {
@@ -116,11 +103,9 @@ describe('Admin.vue - Invite Functionality', () => {
       // Fill in the form
       const emailInput = wrapper.find('input[type="email"]')
       const roleSelect = wrapper.find('select')
-      const urlInput = wrapper.find('input[type="url"]')
 
       await emailInput.setValue('newuser@example.com')
       await roleSelect.setValue('member')
-      await urlInput.setValue('https://chat.tokenbowl.ai')
 
       // Submit the form
       const form = wrapper.find('form')
@@ -130,7 +115,7 @@ describe('Admin.vue - Invite Functionality', () => {
       expect(apiClient.inviteUserByEmail).toHaveBeenCalledWith(
         'newuser@example.com',
         'member',
-        'https://chat.tokenbowl.ai'
+        window.location.origin + '/auth/callback'
       )
     })
 
@@ -146,7 +131,6 @@ describe('Admin.vue - Invite Functionality', () => {
       // Fill and submit form
       await wrapper.find('input[type="email"]').setValue('newuser@example.com')
       await wrapper.find('select').setValue('admin')
-      await wrapper.find('input[type="url"]').setValue('https://chat.tokenbowl.ai')
       await wrapper.find('form').trigger('submit.prevent')
       await flushPromises()
 
@@ -246,14 +230,13 @@ describe('Admin.vue - Invite Functionality', () => {
 
       await wrapper.find('input[type="email"]').setValue('viewer@example.com')
       await wrapper.find('select').setValue('viewer')
-      await wrapper.find('input[type="url"]').setValue('https://chat.tokenbowl.ai')
       await wrapper.find('form').trigger('submit.prevent')
       await flushPromises()
 
       expect(apiClient.inviteUserByEmail).toHaveBeenCalledWith(
         'viewer@example.com',
         'viewer',
-        'https://chat.tokenbowl.ai'
+        window.location.origin + '/auth/callback'
       )
     })
 
@@ -290,12 +273,5 @@ describe('Admin.vue - Invite Functionality', () => {
       expect(roleSelect.attributes('required')).toBeDefined()
     })
 
-    it('should require redirect URL field', async () => {
-      wrapper = createWrapper()
-      await flushPromises()
-
-      const urlInput = wrapper.find('input[type="url"]')
-      expect(urlInput.attributes('required')).toBeDefined()
-    })
   })
 })

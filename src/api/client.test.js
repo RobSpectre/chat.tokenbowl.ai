@@ -60,13 +60,13 @@ describe('ApiClient - Admin Functions', () => {
       const result = await apiClient.inviteUserByEmail(
         'newuser@example.com',
         'member',
-        'https://chat.tokenbowl.ai'
+        'https://chat.tokenbowl.ai/auth/callback'
       )
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/admin/invite', {
         email: 'newuser@example.com',
         role: 'member',
-        signup_url: 'https://chat.tokenbowl.ai'
+        signup_url: 'https://chat.tokenbowl.ai/auth/callback'
       })
 
       expect(result).toEqual(mockResponse.data)
@@ -86,14 +86,14 @@ describe('ApiClient - Admin Functions', () => {
       await apiClient.inviteUserByEmail(
         'newuser@example.com',
         undefined,
-        'https://chat.tokenbowl.ai'
+        'https://chat.tokenbowl.ai/auth/callback'
       )
 
       // Default parameter applies, so 'member' is sent instead of undefined
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/admin/invite', {
         email: 'newuser@example.com',
         role: 'member',
-        signup_url: 'https://chat.tokenbowl.ai'
+        signup_url: 'https://chat.tokenbowl.ai/auth/callback'
       })
     })
 
@@ -111,13 +111,13 @@ describe('ApiClient - Admin Functions', () => {
       await apiClient.inviteUserByEmail(
         'admin@example.com',
         'admin',
-        'https://chat.tokenbowl.ai'
+        'https://chat.tokenbowl.ai/auth/callback'
       )
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/admin/invite', {
         email: 'admin@example.com',
         role: 'admin',
-        signup_url: 'https://chat.tokenbowl.ai'
+        signup_url: 'https://chat.tokenbowl.ai/auth/callback'
       })
     })
 
@@ -135,13 +135,13 @@ describe('ApiClient - Admin Functions', () => {
       await apiClient.inviteUserByEmail(
         'viewer@example.com',
         'viewer',
-        'https://chat.tokenbowl.ai'
+        'https://chat.tokenbowl.ai/auth/callback'
       )
 
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/admin/invite', {
         email: 'viewer@example.com',
         role: 'viewer',
-        signup_url: 'https://chat.tokenbowl.ai'
+        signup_url: 'https://chat.tokenbowl.ai/auth/callback'
       })
     })
 
@@ -160,7 +160,7 @@ describe('ApiClient - Admin Functions', () => {
         apiClient.inviteUserByEmail(
           'test@example.com',
           'member',
-          'https://chat.tokenbowl.ai'
+          'https://chat.tokenbowl.ai/auth/callback'
         )
       ).rejects.toEqual(mockError)
     })
@@ -173,7 +173,7 @@ describe('ApiClient - Admin Functions', () => {
         apiClient.inviteUserByEmail(
           'test@example.com',
           'member',
-          'https://chat.tokenbowl.ai'
+          'https://chat.tokenbowl.ai/auth/callback'
         )
       ).rejects.toThrow('Network Error')
     })
