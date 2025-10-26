@@ -10,6 +10,11 @@ header.bg-gradient-to-r.from-slate-900.via-slate-800.to-slate-900.border-b-4.bor
           .w-2.h-2.rounded-full(v-if="showConnectionStatus" :class="isConnected ? 'bg-green-500' : 'bg-red-500'")
 
       .flex.items-center.space-x-2
+        router-link.px-3.py-2.rounded-lg.transition-colors.text-sm.font-semibold.text-gray-300(
+          to="/docs"
+          title="Documentation"
+          class="hover:bg-slate-700"
+        ) DOCS
         router-link.p-2.rounded-lg.transition-colors.relative(
           to="/direct-messages"
           title="Direct Messages"
