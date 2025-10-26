@@ -36,7 +36,7 @@
           .p-3.rounded-lg.relative(
             :class="message.from_username === currentUsername ? 'bg-blue-600 text-white' : 'bg-slate-800 border border-slate-700 text-gray-200'"
           )
-            p.text-sm.whitespace-pre-wrap.break-words {{ message.content }}
+            .text-sm.break-words.markdown-content(v-html="renderMarkdown(message.content)")
             //- Message status indicator (only for sent messages)
             .absolute.bottom-1.right-2.flex.items-center.space-x-1(v-if="message.from_username === currentUsername")
               //- Error indicator
@@ -73,6 +73,8 @@ import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useUsersStore, useUnreadStore } from '../stores'
 import { animate } from 'motion'
 import apiClient from '../api/client'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 export default {
   name: 'ChatMessages',
@@ -276,6 +278,22 @@ export default {
       return usersStore.isUserBot(username)
     }
 
+    const renderMarkdown = (content) => {
+      if (!content) return ''
+
+      // Configure marked options
+      marked.setOptions({
+        breaks: true, // Convert line breaks to <br>
+        gfm: true // Enable GitHub Flavored Markdown
+      })
+
+      // Parse markdown to HTML
+      const rawHtml = marked.parse(content)
+
+      // Sanitize HTML to prevent XSS attacks
+      return DOMPurify.sanitize(rawHtml)
+    }
+
     return {
       apiBaseUrl,
       messagesContainer,
@@ -284,7 +302,8 @@ export default {
       getUserLogo,
       getUserEmoji,
       isUserBot,
-      scrollToBottom
+      scrollToBottom,
+      renderMarkdown
     }
   }
 }
@@ -315,5 +334,136 @@ export default {
 #messages-container {
   scrollbar-width: thin;
   scrollbar-color: rgba(71, 85, 105, 0.5) rgba(15, 23, 42, 0.3);
+}
+
+/* Markdown content styling */
+.markdown-content {
+  line-height: 1.6;
+}
+
+.markdown-content :deep(h1),
+.markdown-content :deep(h2),
+.markdown-content :deep(h3),
+.markdown-content :deep(h4),
+.markdown-content :deep(h5),
+.markdown-content :deep(h6) {
+  font-weight: 600;
+  margin-top: 0.75em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+.markdown-content :deep(h1) {
+  font-size: 1.5em;
+}
+
+.markdown-content :deep(h2) {
+  font-size: 1.3em;
+}
+
+.markdown-content :deep(h3) {
+  font-size: 1.15em;
+}
+
+.markdown-content :deep(h4),
+.markdown-content :deep(h5),
+.markdown-content :deep(h6) {
+  font-size: 1em;
+}
+
+.markdown-content :deep(p) {
+  margin: 0.5em 0;
+}
+
+.markdown-content :deep(p:first-child) {
+  margin-top: 0;
+}
+
+.markdown-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-content :deep(strong) {
+  font-weight: 700;
+}
+
+.markdown-content :deep(em) {
+  font-style: italic;
+}
+
+.markdown-content :deep(code) {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 0.15em 0.4em;
+  border-radius: 3px;
+  font-size: 0.9em;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.markdown-content :deep(pre) {
+  background-color: rgba(0, 0, 0, 0.3);
+  padding: 0.75em 1em;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0.75em 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.markdown-content :deep(pre code) {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.85em;
+}
+
+.markdown-content :deep(ul),
+.markdown-content :deep(ol) {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.markdown-content :deep(li) {
+  margin: 0.25em 0;
+}
+
+.markdown-content :deep(blockquote) {
+  border-left: 3px solid rgba(255, 255, 255, 0.3);
+  padding-left: 1em;
+  margin: 0.75em 0;
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.markdown-content :deep(a) {
+  color: inherit;
+  text-decoration: underline;
+  opacity: 0.9;
+}
+
+.markdown-content :deep(a:hover) {
+  opacity: 1;
+}
+
+.markdown-content :deep(hr) {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  margin: 1em 0;
+}
+
+.markdown-content :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75em 0;
+}
+
+.markdown-content :deep(th),
+.markdown-content :deep(td) {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.5em;
+  text-align: left;
+}
+
+.markdown-content :deep(th) {
+  font-weight: 600;
+  background-color: rgba(0, 0, 0, 0.2);
 }
 </style>
