@@ -280,18 +280,75 @@ export default {
 
     const renderMarkdown = (content) => {
       if (!content) return ''
+      try {
+        // Strip surrounding backticks if present (both single ` and triple ```)
+        let processedContent = content.trim()
 
-      // Configure marked options
-      marked.setOptions({
-        breaks: true, // Convert line breaks to <br>
-        gfm: true // Enable GitHub Flavored Markdown
-      })
+        // Check if content looks like markdown (contains markdown syntax)
+        const looksLikeMarkdown = (text) => {
+          return /#{1,6}\s/.test(text) || /^\s*[*\-+]\s/.test(text) || /^\s*\d+\.\s/.test(text)
+        }
 
-      // Parse markdown to HTML
-      const rawHtml = marked.parse(content)
+        // Remove triple backticks if they wrap markdown
+        if (processedContent.startsWith('```') && processedContent.endsWith('```')) {
+          const innerContent = processedContent.slice(3, -3).trim()
 
-      // Sanitize HTML to prevent XSS attacks
-      return DOMPurify.sanitize(rawHtml)
+          // Check for language identifier on the first line
+          const firstNewline = innerContent.indexOf('\n')
+          let langIdentifier = ''
+          let contentWithoutLang = innerContent
+
+          if (firstNewline !== -1 && firstNewline < 20) {
+            const firstLine = innerContent.substring(0, firstNewline).trim()
+            if (firstLine.length < 20 && !/\s/.test(firstLine)) {
+              langIdentifier = firstLine.toLowerCase()
+              contentWithoutLang = innerContent.substring(firstNewline + 1).trim()
+            }
+          }
+
+          // Strip backticks if:
+          // 1. Language is "markdown" or "md", OR
+          // 2. No language identifier and content looks like markdown
+          if (langIdentifier === 'markdown' || langIdentifier === 'md' ||
+              (!langIdentifier && looksLikeMarkdown(contentWithoutLang))) {
+            processedContent = contentWithoutLang
+          }
+          // Otherwise leave as-is for marked to handle as code block
+        }
+        // Remove single backticks if they wrap markdown
+        else if (processedContent.startsWith('`') && processedContent.endsWith('`')) {
+          const innerContent = processedContent.slice(1, -1).trim()
+          if (looksLikeMarkdown(innerContent)) {
+            processedContent = innerContent
+          }
+          // Otherwise leave as-is for marked to handle as inline code
+        }
+
+        // Remove common markdown prefix words that people might add
+        processedContent = processedContent.replace(/^(markdown|md)\s+/i, '')
+
+        // Add line breaks for inline markdown to render properly
+        // Add newline before headers (##, ###, etc.)
+        processedContent = processedContent.replace(/\s+(#{1,6})\s+/g, '\n\n$1 ')
+        // Add newline before list items (*, -, +, or numbered lists)
+        processedContent = processedContent.replace(/\s+([*\-+]|\d+\.)\s+/g, '\n$1 ')
+
+        // Configure marked options
+        marked.setOptions({
+          breaks: true, // Convert line breaks to <br>
+          gfm: true // Enable GitHub Flavored Markdown
+        })
+
+        // Parse markdown to HTML
+        const rawHtml = marked.parse(processedContent)
+
+        // Sanitize HTML to prevent XSS attacks
+        return DOMPurify.sanitize(rawHtml)
+      } catch (error) {
+        console.error('[ChatMessages] Failed to parse markdown:', error, 'Content:', content)
+        // Fallback to plain text if parsing fails
+        return content
+      }
     }
 
     return {
