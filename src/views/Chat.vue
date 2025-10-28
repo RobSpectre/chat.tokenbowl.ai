@@ -44,7 +44,10 @@
         v-model="newMessage"
         :disabled="!connected"
         :enableReadReceipts="true"
+        :isLoadingMore="isLoadingMore"
+        :hasMoreMessages="hasMoreMessages"
         @send-message="sendMessage"
+        @load-more="loadMoreMessages"
       )
 </template>
 
@@ -78,6 +81,12 @@ export default {
     const newMessage = ref('')
     let userPollInterval = null
 
+    // Pagination state
+    const isLoadingMore = ref(false)
+    const hasMoreMessages = ref(true)
+    const messageOffset = ref(0)
+    const PAGE_SIZE = 50
+
     // Computed property to filter users excluding current user and bots
     const filteredUsers = computed(() =>
       usersStore.getUsersExcludingCurrent(username).filter(user => !user.bot)
@@ -88,15 +97,51 @@ export default {
       publicMessages.value.filter(msg => msg && msg.from_username && msg.content !== undefined)
     )
 
+    // Load more messages for infinite scroll
+    const loadMoreMessages = async () => {
+      if (isLoadingMore.value || !hasMoreMessages.value) return
+
+      isLoadingMore.value = true
+      try {
+        const messages = await messagesStore.loadPublicMessages(PAGE_SIZE, messageOffset.value)
+
+        if (messageOffset.value === 0) {
+          // Initial load - replace messages
+          messageOffset.value = messages.length
+          if (messages.length < PAGE_SIZE) {
+            hasMoreMessages.value = false
+          }
+        } else {
+          // Append older messages to the beginning
+          messagesStore.publicMessages = [...messages, ...messagesStore.publicMessages]
+          messageOffset.value += messages.length
+
+          if (messages.length < PAGE_SIZE) {
+            hasMoreMessages.value = false
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load more messages:', error)
+      } finally {
+        isLoadingMore.value = false
+      }
+    }
+
     onMounted(async () => {
       // Load initial messages from REST API
-      await messagesStore.loadPublicMessages()
+      await loadMoreMessages()
 
       // Load users
       await usersStore.loadUsers()
 
       // Connect to WebSocket for real-time updates
       connect()
+
+      // Start connection health check
+      const wsStore = useWebSocket()
+      if (wsStore.startConnectionHealthCheck) {
+        wsStore.startConnectionHealthCheck()
+      }
 
       // Poll for online users every 30 seconds
       userPollInterval = setInterval(() => usersStore.loadUsers(), 30000)
@@ -113,14 +158,16 @@ export default {
       if (newMessages.length > 0) {
         const latestMessage = newMessages[newMessages.length - 1]
 
-        // Only process public messages
-        if (!latestMessage.message_type || latestMessage.message_type === 'public') {
+        // Only process room messages (public chat)
+        if (!latestMessage.message_type || latestMessage.message_type === 'room') {
           // Set default status to 'delivered' for messages from server
           if (!latestMessage.status) {
             latestMessage.status = 'delivered'
           }
 
           messagesStore.addPublicMessage(latestMessage)
+          // Increment offset when new messages arrive via WebSocket
+          messageOffset.value++
         }
       }
     }, { deep: true })
@@ -191,7 +238,10 @@ export default {
       getUserEmoji,
       isUserBot,
       startDirectMessage,
-      isUserOnline
+      isUserOnline,
+      isLoadingMore,
+      hasMoreMessages,
+      loadMoreMessages
     }
   }
 }

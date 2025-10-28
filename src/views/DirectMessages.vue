@@ -62,7 +62,10 @@
           :currentUsername="username"
           v-model="newMessage"
           :enableReadReceipts="true"
+          :isLoadingMore="isLoadingMore"
+          :hasMoreMessages="hasMoreMessages"
           @send-message="sendDirectMessage"
+          @load-more="loadMoreMessages"
         )
 
     //- No conversation selected or no conversations at all
@@ -113,6 +116,12 @@ export default {
     const activeConversation = ref(null)
     const newMessage = ref('')
 
+    // Pagination state for infinite scroll
+    const isLoadingMore = ref(false)
+    const hasMoreMessages = ref(true)
+    const messageOffset = ref(0)
+    const PAGE_SIZE = 50
+
     // Computed property to filter conversations excluding logged in user and bots
     const filteredConversations = computed(() =>
       conversations.value.filter(conv =>
@@ -126,6 +135,31 @@ export default {
         ? messagesStore.getConversationMessages(activeConversation.value)
         : []
     )
+
+    // Load more messages for infinite scroll
+    const loadMoreMessages = async () => {
+      if (isLoadingMore.value || !hasMoreMessages.value || !activeConversation.value) return
+
+      isLoadingMore.value = true
+      try {
+        // Load more direct messages with pagination
+        const messages = await messagesStore.loadDirectMessages(PAGE_SIZE, messageOffset.value)
+
+        // Since loadDirectMessages groups by conversation, we need to check
+        // if we got new messages for the current conversation
+        const conversationMessages = messagesStore.getConversationMessages(activeConversation.value)
+
+        if (messages.length < PAGE_SIZE) {
+          hasMoreMessages.value = false
+        }
+
+        messageOffset.value += messages.length
+      } catch (error) {
+        console.error('Failed to load more messages:', error)
+      } finally {
+        isLoadingMore.value = false
+      }
+    }
 
     onMounted(async () => {
       // Connect to WebSocket
@@ -172,6 +206,9 @@ export default {
     const selectConversation = (user) => {
       if (!user) return
       activeConversation.value = user
+      // Reset pagination state when switching conversations
+      messageOffset.value = 0
+      hasMoreMessages.value = true
     }
 
     const sendDirectMessage = async () => {
@@ -230,7 +267,10 @@ export default {
       sendDirectMessage,
       getUserLogo,
       getUserEmoji,
-      isUserBot
+      isUserBot,
+      isLoadingMore,
+      hasMoreMessages,
+      loadMoreMessages
     }
   }
 }

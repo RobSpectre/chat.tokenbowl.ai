@@ -8,7 +8,8 @@ export const useWebSocketStore = defineStore('websocket', {
     messages: [],
     reconnectTimeout: null,
     reconnectAttempts: 0,
-    maxReconnectDelay: 300000 // 5 minutes in milliseconds
+    maxReconnectDelay: 30000, // Cap at 30 seconds for better responsiveness
+    connectionCheckInterval: null
   }),
 
   getters: {
@@ -36,6 +37,12 @@ export const useWebSocketStore = defineStore('websocket', {
           this.connected = true
           this.reconnectAttempts = 0
           console.log('WebSocket connected')
+
+          // Clear any pending reconnection timeout
+          if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout)
+            this.reconnectTimeout = null
+          }
         }
 
         this.ws.onmessage = (event) => {
@@ -56,21 +63,23 @@ export const useWebSocketStore = defineStore('websocket', {
 
         this.ws.onclose = (event) => {
           this.connected = false
-          console.log('WebSocket disconnected', event.code, event.reason)
+          console.log('WebSocket disconnected:', event.code, event.reason)
+
+          // Clear the WebSocket reference
+          this.ws = null
 
           // Don't reconnect if this was an intentional close (disconnect() was called)
           // Normal close code is 1000, abnormal closures will have different codes
           const wasIntentional = event.code === 1000 && event.wasClean
 
           if (!wasIntentional) {
-            // Attempt to reconnect with exponential backoff, capped at 5 minutes
+            // Always attempt to reconnect with exponential backoff (infinite retries)
             const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), this.maxReconnectDelay)
-            this.reconnectAttempts++
 
-            const delaySeconds = (delay / 1000).toFixed(1)
-            console.log(`Reconnecting in ${delaySeconds}s... (attempt ${this.reconnectAttempts})`)
+            console.log(`Reconnecting in ${delay/1000} seconds... (attempt ${this.reconnectAttempts + 1})`)
 
             this.reconnectTimeout = setTimeout(() => {
+              this.reconnectAttempts++
               this.connect()
             }, delay)
           } else {
@@ -99,7 +108,14 @@ export const useWebSocketStore = defineStore('websocket', {
         this.reconnectTimeout = null
       }
 
+      if (this.connectionCheckInterval) {
+        clearInterval(this.connectionCheckInterval)
+        this.connectionCheckInterval = null
+      }
+
       if (this.ws) {
+        // Prevent reconnection on manual close
+        this.ws.onclose = null
         // Close with code 1000 (normal closure) so onclose knows this was intentional
         this.ws.close(1000, 'User disconnected')
         this.ws = null
@@ -107,6 +123,21 @@ export const useWebSocketStore = defineStore('websocket', {
       }
 
       this.reconnectAttempts = 0 // Reset attempts
+    },
+
+    // Start periodic connection health check
+    startConnectionHealthCheck() {
+      if (this.connectionCheckInterval) {
+        clearInterval(this.connectionCheckInterval)
+      }
+
+      this.connectionCheckInterval = setInterval(() => {
+        if (!this.connected && !this.reconnectTimeout) {
+          console.log('Connection lost and not reconnecting. Attempting to reconnect...')
+          this.reconnectAttempts = 0
+          this.connect()
+        }
+      }, 10000) // Check every 10 seconds
     },
 
     clearMessages() {

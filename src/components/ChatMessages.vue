@@ -1,7 +1,17 @@
 <template lang="pug">
 .flex.flex-col.h-full
   //- Messages
-  .flex-1.overflow-y-auto.p-4.space-y-4#messages-container(ref="messagesContainer")
+  .flex-1.overflow-y-auto.p-4.space-y-4#messages-container(ref="messagesContainer" @scroll="handleScroll")
+    //- Loading indicator for older messages
+    .flex.justify-center.py-4(v-if="isLoadingMore")
+      .flex.items-center.space-x-2
+        .animate-spin.rounded-full.h-4.w-4.border-b-2.border-white
+        span.text-gray-400.text-sm Loading older messages...
+
+    //- No more messages indicator
+    .text-center.text-gray-500.text-xs.py-2(v-if="!hasMoreMessages && messages.length > 0")
+      p Beginning of conversation
+
     .text-center.text-gray-500.text-sm.mb-4(v-if="messages.length === 0")
       p {{ emptyMessage }}
 
@@ -99,6 +109,14 @@ export default {
       type: Boolean,
       default: false
     },
+    isLoadingMore: {
+      type: Boolean,
+      default: false
+    },
+    hasMoreMessages: {
+      type: Boolean,
+      default: true
+    },
     emptyMessage: {
       type: String,
       default: 'No messages yet. Start the conversation!'
@@ -112,7 +130,7 @@ export default {
       default: true
     }
   },
-  emits: ['update:modelValue', 'send-message'],
+  emits: ['update:modelValue', 'send-message', 'load-more'],
   setup(props, { emit }) {
     const usersStore = useUsersStore()
     const unreadStore = useUnreadStore()
@@ -278,6 +296,19 @@ export default {
       return usersStore.isUserBot(username)
     }
 
+    // Handle scroll event for infinite scroll
+    const handleScroll = () => {
+      if (!messagesContainer.value) return
+      if (props.isLoadingMore) return // Don't trigger if already loading
+
+      const { scrollTop } = messagesContainer.value
+      const threshold = 100 // Load more when within 100px from top
+
+      if (scrollTop < threshold && props.hasMoreMessages) {
+        emit('load-more')
+      }
+    }
+
     const renderMarkdown = (content) => {
       if (!content) return ''
       try {
@@ -360,7 +391,8 @@ export default {
       getUserEmoji,
       isUserBot,
       scrollToBottom,
-      renderMarkdown
+      renderMarkdown,
+      handleScroll
     }
   }
 }
