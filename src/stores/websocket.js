@@ -48,6 +48,14 @@ export const useWebSocketStore = defineStore('websocket', {
         this.ws.onmessage = (event) => {
           const message = JSON.parse(event.data)
 
+          // Handle heartbeat ping/pong
+          if (message.type === 'ping') {
+            // Respond to ping with pong to keep connection alive
+            this.ws.send(JSON.stringify({ type: 'pong' }))
+            console.log('Received ping, sent pong')
+            return
+          }
+
           // Only add message if we don't already have this ID
           if (message.id && !this.messages.find(m => m.id === message.id)) {
             this.messages.push(message)

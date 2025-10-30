@@ -15,6 +15,12 @@ header.bg-gradient-to-r.from-slate-900.via-slate-800.to-slate-900.border-b-4.bor
           title="Documentation"
           class="hover:bg-slate-700"
         ) DOCS
+        router-link.p-2.rounded-lg.transition-colors(
+          to="/conversations"
+          title="Conversations"
+          class="hover:bg-slate-700"
+        )
+          ChatBubbleLeftRightIcon.w-6.h-6.text-gray-300
         router-link.p-2.rounded-lg.transition-colors.relative(
           to="/direct-messages"
           title="Direct Messages"
@@ -49,7 +55,7 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { useUnreadStore } from '../stores'
-import { EnvelopeIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, ShieldCheckIcon } from '@heroicons/vue/24/outline'
+import { EnvelopeIcon, Cog6ToothIcon, ArrowRightOnRectangleIcon, ShieldCheckIcon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 
 export default {
   name: 'TopNav',
@@ -57,7 +63,8 @@ export default {
     EnvelopeIcon,
     Cog6ToothIcon,
     ArrowRightOnRectangleIcon,
-    ShieldCheckIcon
+    ShieldCheckIcon,
+    ChatBubbleLeftRightIcon
   },
   props: {
     title: {

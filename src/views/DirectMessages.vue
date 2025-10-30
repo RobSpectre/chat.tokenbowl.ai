@@ -57,15 +57,18 @@
             p.text-sm.text-gray-400 Direct Message
 
       .flex-1.flex.flex-col.overflow-hidden
-        ChatMessages(
+        ChatMessagesEnhanced(
           :messages="directMessages"
           :currentUsername="username"
           v-model="newMessage"
           :enableReadReceipts="true"
           :isLoadingMore="isLoadingMore"
           :hasMoreMessages="hasMoreMessages"
+          :isDirectMessage="true"
           @send-message="sendDirectMessage"
           @load-more="loadMoreMessages"
+          @messages-deleted="handleMessagesDeleted"
+          @conversation-created="handleConversationCreated"
         )
 
     //- No conversation selected or no conversations at all
@@ -95,13 +98,13 @@ import { useMessagesStore, useUsersStore } from '../stores'
 import { useAuth } from '../composables/useAuth'
 import { useWebSocket } from '../composables/useWebSocket'
 import TopNav from '../components/TopNav.vue'
-import ChatMessages from '../components/ChatMessages.vue'
+import ChatMessagesEnhanced from '../components/ChatMessagesEnhanced.vue'
 
 export default {
   name: 'DirectMessages',
   components: {
     TopNav,
-    ChatMessages
+    ChatMessagesEnhanced
   },
   setup() {
     const route = useRoute()
@@ -255,6 +258,32 @@ export default {
       return usersStore.isUserBot(username)
     }
 
+    // Handle message deletion
+    const handleMessagesDeleted = (messageIds) => {
+      // Remove deleted messages from the store
+      messagesStore.conversations = messagesStore.conversations.map(conv => {
+        if (conv.username === activeConversation.value) {
+          return {
+            ...conv,
+            messages: conv.messages?.filter(msg => !messageIds.includes(msg.id)) || []
+          }
+        }
+        return conv
+      })
+
+      // Adjust offset
+      messageOffset.value = Math.max(0, messageOffset.value - messageIds.length)
+
+      // Show success feedback
+      console.log(`Deleted ${messageIds.length} message(s)`)
+    }
+
+    // Handle conversation creation
+    const handleConversationCreated = (conversation) => {
+      console.log('Conversation created from direct messages:', conversation)
+      // Optionally, navigate to a conversations view or show a toast
+    }
+
     return {
       apiBaseUrl,
       directMessages,
@@ -270,7 +299,9 @@ export default {
       isUserBot,
       isLoadingMore,
       hasMoreMessages,
-      loadMoreMessages
+      loadMoreMessages,
+      handleMessagesDeleted,
+      handleConversationCreated
     }
   }
 }

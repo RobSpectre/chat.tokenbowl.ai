@@ -84,6 +84,27 @@ class ApiClient {
     return response.data
   }
 
+  async getMyBots() {
+    const response = await this.client.get('/bots/me')
+    return response.data
+  }
+
+  async updateBot(botId, updates) {
+    const response = await this.client.patch(`/bots/${botId}`, updates)
+    return response.data
+  }
+
+  async deleteBot(botId) {
+    const response = await this.client.delete(`/bots/${botId}`)
+    return response.data
+  }
+
+  async regenerateBotApiKey(botId) {
+    const response = await this.client.post(`/bots/${botId}/regenerate-api-key`)
+    return response.data
+  }
+
+  // Admin endpoints
   async deleteUser(userId) {
     const response = await this.client.delete(`/admin/users/${userId}`)
     return response.data
@@ -91,6 +112,11 @@ class ApiClient {
 
   async getAllUsersAdmin() {
     const response = await this.client.get('/admin/users')
+    return response.data
+  }
+
+  async getAdminUser(userId) {
+    const response = await this.client.get(`/admin/users/${userId}`)
     return response.data
   }
 
@@ -112,6 +138,30 @@ class ApiClient {
     const response = await this.client.patch(`/admin/users/${userId}/role`, {
       role
     })
+    return response.data
+  }
+
+  // Admin message endpoints
+  async getAdminMessage(messageId) {
+    const response = await this.client.get(`/admin/messages/${messageId}`)
+    return response.data
+  }
+
+  async updateAdminMessage(messageId, content) {
+    const response = await this.client.patch(`/admin/messages/${messageId}`, {
+      content
+    })
+    return response.data
+  }
+
+  async deleteAdminMessage(messageId) {
+    const response = await this.client.delete(`/admin/messages/${messageId}`)
+    return response.data
+  }
+
+  // Admin conversation endpoints
+  async deleteAdminConversation(conversationId) {
+    const response = await this.client.delete(`/admin/conversations/${conversationId}`)
     return response.data
   }
 
@@ -183,6 +233,38 @@ class ApiClient {
     return response.data
   }
 
+  // Conversation endpoints
+  async createConversation(title = null, description = null, messageIds = []) {
+    const response = await this.client.post('/conversations', {
+      title,
+      description,
+      message_ids: messageIds
+    })
+    return response.data
+  }
+
+  async getConversations(limit = 50, offset = 0) {
+    const response = await this.client.get('/conversations', {
+      params: { limit, offset }
+    })
+    return response.data
+  }
+
+  async getConversation(conversationId) {
+    const response = await this.client.get(`/conversations/${conversationId}`)
+    return response.data
+  }
+
+  async updateConversation(conversationId, updates) {
+    const response = await this.client.patch(`/conversations/${conversationId}`, updates)
+    return response.data
+  }
+
+  async deleteConversation(conversationId) {
+    const response = await this.client.delete(`/conversations/${conversationId}`)
+    return response.data
+  }
+
   // User endpoints
   async getUsers() {
     const response = await this.client.get('/users')
@@ -196,6 +278,11 @@ class ApiClient {
 
   async getUserProfile(username) {
     const response = await this.client.get(`/users/${username}`)
+    return response.data
+  }
+
+  async getUserById(userId) {
+    const response = await this.client.get(`/users/${userId}`)
     return response.data
   }
 

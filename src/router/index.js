@@ -26,7 +26,7 @@ const routes = [
   {
     path: '/chat',
     name: 'Chat',
-    component: () => import('../views/Chat.vue'),
+    component: () => import('../views/ChatEnhanced.vue'),
     meta: { requiresAuth: true }
   },
   {
@@ -39,6 +39,12 @@ const routes = [
     path: '/direct-messages',
     name: 'DirectMessages',
     component: () => import('../views/DirectMessages.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/conversations',
+    name: 'Conversations',
+    component: () => import('../views/Conversations.vue'),
     meta: { requiresAuth: true }
   },
   {
