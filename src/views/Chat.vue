@@ -6,55 +6,23 @@
     :isConnected="connected"
   )
 
-  //- Main Content
-  .flex-1.flex.overflow-hidden
-    //- Sidebar - Online Users
-    aside.w-64.bg-slate-900.border-r.border-slate-800.overflow-y-auto.hidden(class="lg:block")
-      .p-4
-        h2.text-lg.font-semibold.text-white.mb-4 All Users ({{ allUsers.length }})
-        .space-y-2
-          .flex.items-center.space-x-3.p-2.rounded-lg.cursor-pointer(
-            v-for="user in allUsers.filter(u => u.username)"
-            :key="user.username"
-            @click="startDirectMessage(user.username)"
-            class="hover:bg-slate-800 transition-colors"
-          )
-            .relative
-              .w-10.h-10.flex.items-center.justify-center
-                img(
-                  v-if="user.logo"
-                  :src="`${apiBaseUrl}/public/images/${user.logo}`"
-                  :alt="user.username"
-                  class="w-full h-full object-contain"
-                )
-                span.text-xl(v-else-if="user.emoji") {{ user.emoji }}
-                .w-10.h-10.rounded-full.bg-slate-700.flex.items-center.justify-center(v-else)
-                  span.text-sm.font-medium.text-gray-300 {{ user.username?.[0]?.toUpperCase() || '?' }}
-              .absolute.bottom-0.right-0.w-3.h-3.rounded-full.border-2.border-slate-900(:class="isUserOnline(user.username) ? 'bg-green-500' : 'bg-red-500'")
-            .flex-1
-              .flex.items-center.gap-1
-                span.text-sm.font-medium(:class="isUserOnline(user.username) ? 'text-white' : 'text-gray-400'") {{ user.username }}
-                .text-xs.bg-purple-600.text-white.rounded(v-if="user.bot" style="padding: 2px 6px") BOT
-
-    //- Chat Area
-    main.flex-1.flex.flex-col.overflow-hidden.bg-slate-950
-      ChatMessages(
-        :messages="messages"
-        :currentUsername="username"
-        v-model="newMessage"
-        :disabled="!connected"
-        :enableReadReceipts="true"
-        :isLoadingMore="isLoadingMore"
-        :hasMoreMessages="hasMoreMessages"
-        @send-message="sendMessage"
-        @load-more="loadMoreMessages"
-      )
+  //- Main Content - Full Width Chat
+  .flex-1.flex.flex-col.overflow-hidden.bg-slate-950
+    ChatMessages(
+      :messages="messages"
+      :currentUsername="username"
+      v-model="newMessage"
+      :disabled="!connected"
+      :enableReadReceipts="true"
+      :isLoadingMore="isLoadingMore"
+      :hasMoreMessages="hasMoreMessages"
+      @send-message="sendMessage"
+      @load-more="loadMoreMessages"
+    )
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useMessagesStore, useUsersStore } from '../stores'
 import { useAuth } from '../composables/useAuth'
 import { useWebSocket } from '../composables/useWebSocket'
@@ -68,16 +36,11 @@ export default {
     ChatMessages
   },
   setup() {
-    const router = useRouter()
     const messagesStore = useMessagesStore()
     const usersStore = useUsersStore()
     const { username, currentUser } = useAuth()
-    const { connected, connect, sendMessage: wsSendMessage, messages: wsMessages, disconnect } = useWebSocket()
+    const { connected, connect, sendMessage: wsSendMessage, messages: wsMessages } = useWebSocket()
 
-    const { publicMessages, userLogos } = storeToRefs(messagesStore)
-    const { allUsers, onlineUsers } = storeToRefs(usersStore)
-
-    const apiBaseUrl = import.meta.env.VITE_TOKEN_BOWL_CHAT_API_URL || 'http://localhost:8000'
     const newMessage = ref('')
     let userPollInterval = null
 
@@ -87,14 +50,9 @@ export default {
     const messageOffset = ref(0)
     const PAGE_SIZE = 50
 
-    // Computed property to filter users excluding current user and bots
-    const filteredUsers = computed(() =>
-      usersStore.getUsersExcludingCurrent(username).filter(user => !user.bot)
-    )
-
-    // Computed property to filter out invalid messages
+    // Computed property to filter out invalid messages and ensure chronological order
     const validMessages = computed(() =>
-      publicMessages.value.filter(msg => msg && msg.from_username && msg.content !== undefined)
+      messagesStore.getPublicMessages.filter(msg => msg && msg.from_username && msg.content !== undefined)
     )
 
     // Load more messages for infinite scroll
@@ -201,44 +159,12 @@ export default {
       }
     }
 
-    const getUserLogo = (username) => {
-      // Try users store first (more reliable), fallback to messages store
-      return usersStore.getUserLogo(username) || messagesStore.getUserLogo(username)
-    }
-
-    const getUserEmoji = (username) => {
-      return usersStore.getUserEmoji(username)
-    }
-
-    const isUserBot = (username) => {
-      return usersStore.isUserBot(username)
-    }
-
-    const startDirectMessage = (user) => {
-      router.push({
-        name: 'DirectMessages',
-        query: { user }
-      })
-    }
-
-    const isUserOnline = (user) => {
-      return usersStore.isUserOnline(user)
-    }
-
     return {
-      apiBaseUrl,
       messages: validMessages,
       newMessage,
-      onlineUsers,
-      allUsers: filteredUsers,
       connected,
       username,
       sendMessage,
-      getUserLogo,
-      getUserEmoji,
-      isUserBot,
-      startDirectMessage,
-      isUserOnline,
       isLoadingMore,
       hasMoreMessages,
       loadMoreMessages

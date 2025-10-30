@@ -10,7 +10,14 @@ export const useMessagesStore = defineStore('messages', {
   }),
 
   getters: {
-    getPublicMessages: (state) => state.publicMessages,
+    getPublicMessages: (state) => {
+      // Sort messages by timestamp to ensure chronological order
+      return [...state.publicMessages].sort((a, b) => {
+        const timeA = new Date(a.timestamp).getTime()
+        const timeB = new Date(b.timestamp).getTime()
+        return timeA - timeB
+      })
+    },
     getDirectMessages: (state) => state.directMessages,
     getConversations: (state) => state.conversations,
     getUserLogo: (state) => (username) => state.userLogos[username] || null,
