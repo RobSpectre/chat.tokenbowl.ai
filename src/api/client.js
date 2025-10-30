@@ -141,6 +141,11 @@ class ApiClient {
     return response.data
   }
 
+  async getWebSocketConnections() {
+    const response = await this.client.get('/admin/websocket/connections')
+    return response.data
+  }
+
   // Admin message endpoints
   async getAdminMessage(messageId) {
     const response = await this.client.get(`/admin/messages/${messageId}`)
