@@ -64,19 +64,17 @@ export default {
         const messages = await messagesStore.loadPublicMessages(PAGE_SIZE, messageOffset.value)
 
         if (messageOffset.value === 0) {
-          // Initial load - replace messages
-          messageOffset.value = messages.length
-          if (messages.length < PAGE_SIZE) {
-            hasMoreMessages.value = false
-          }
+          // Initial load - messages are already set in store
+          messageOffset.value = PAGE_SIZE
         } else {
           // Append older messages to the beginning
           messagesStore.publicMessages = [...messages, ...messagesStore.publicMessages]
-          messageOffset.value += messages.length
+          messageOffset.value += PAGE_SIZE
+        }
 
-          if (messages.length < PAGE_SIZE) {
-            hasMoreMessages.value = false
-          }
+        // Check if we've loaded all messages
+        if (messages.length < PAGE_SIZE) {
+          hasMoreMessages.value = false
         }
       } catch (error) {
         console.error('Failed to load more messages:', error)

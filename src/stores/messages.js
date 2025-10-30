@@ -32,7 +32,8 @@ export const useMessagesStore = defineStore('messages', {
     async loadPublicMessages(limit = 100, offset = 0) {
       try {
         const response = await apiClient.getMessages(limit, offset)
-        this.publicMessages = response.messages
+        // Backend returns messages DESC (newest first), reverse for chronological display
+        this.publicMessages = response.messages.reverse()
 
         // Extract user logos from messages
         response.messages.forEach(msg => {
