@@ -77,7 +77,6 @@ export const useWebSocketStore = defineStore('websocket', {
 
         // Get connection token from server
         const connectionInfo = await apiClient.getCentrifugoConnectionToken()
-        console.log('Got Centrifugo connection token for channels:', connectionInfo.channels)
 
         // Create Centrifugo client
         this.centrifuge = new Centrifuge(connectionInfo.url, {
@@ -89,7 +88,6 @@ export const useWebSocketStore = defineStore('websocket', {
           this.connected = true
           this.connecting = false
           this.reconnectAttempts = 0
-          console.log('Centrifugo connected:', ctx)
 
           // Clear any pending reconnection timeout
           if (this.reconnectTimeout) {
@@ -101,7 +99,6 @@ export const useWebSocketStore = defineStore('websocket', {
         this.centrifuge.on('disconnected', (ctx) => {
           this.connected = false
           this.connecting = false
-          console.log('Centrifugo disconnected:', ctx)
         })
 
         this.centrifuge.on('error', (ctx) => {
@@ -110,12 +107,10 @@ export const useWebSocketStore = defineStore('websocket', {
 
         // Set up subscriptions
         for (const channel of connectionInfo.channels) {
-          console.log('Setting up subscription for', channel)
           const subscription = this.centrifuge.newSubscription(channel)
 
           subscription.on('publication', (ctx) => {
             const message = ctx.data
-            console.log('Received message on', channel, ':', message)
 
             // Only add message if we don't already have this ID
             if (message.id && !this.messages.find(m => m.id === message.id)) {
@@ -127,14 +122,13 @@ export const useWebSocketStore = defineStore('websocket', {
           })
 
           subscription.on('subscribed', (ctx) => {
-            console.log('Subscribed to', channel, ':', ctx)
+            // Subscription successful
           })
 
           subscription.on('error', (ctx) => {
             // Ignore "already subscribed" errors - they're harmless
             const errorMsg = ctx.error?.message || ctx.message || JSON.stringify(ctx)
             if (errorMsg.includes('already subscribed')) {
-              console.log(`Channel ${channel} subscription reused (this is normal)`)
               return
             }
             console.error('Subscription error on', channel, ':', ctx)
@@ -159,7 +153,6 @@ export const useWebSocketStore = defineStore('websocket', {
 
         // Retry connection with exponential backoff
         const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), this.maxReconnectDelay)
-        console.log(`Reconnecting in ${delay/1000} seconds... (attempt ${this.reconnectAttempts + 1})`)
 
         this.reconnectTimeout = setTimeout(() => {
           this.reconnectAttempts++
@@ -182,8 +175,6 @@ export const useWebSocketStore = defineStore('websocket', {
     },
 
     disconnect() {
-      console.log('Disconnecting from Centrifugo...')
-
       // Clear any pending connection promise
       connectionPromise = null
 
@@ -199,14 +190,12 @@ export const useWebSocketStore = defineStore('websocket', {
 
       // Unsubscribe from channels
       if (this.roomSubscription) {
-        console.log('Unsubscribing from room:main')
         this.roomSubscription.unsubscribe()
         this.roomSubscription.remove() // Remove subscription from Centrifuge instance
         this.roomSubscription = null
       }
 
       if (this.userSubscription) {
-        console.log('Unsubscribing from user channel')
         this.userSubscription.unsubscribe()
         this.userSubscription.remove() // Remove subscription from Centrifuge instance
         this.userSubscription = null
@@ -214,7 +203,6 @@ export const useWebSocketStore = defineStore('websocket', {
 
       // Disconnect from Centrifugo
       if (this.centrifuge) {
-        console.log('Disconnecting Centrifuge client')
         this.centrifuge.disconnect()
         this.centrifuge = null
         this.connected = false
@@ -222,7 +210,6 @@ export const useWebSocketStore = defineStore('websocket', {
       }
 
       this.reconnectAttempts = 0 // Reset attempts
-      console.log('Disconnect complete')
     },
 
     // Start periodic connection health check
@@ -233,7 +220,6 @@ export const useWebSocketStore = defineStore('websocket', {
 
       this.connectionCheckInterval = setInterval(() => {
         if (!this.connected && !this.reconnectTimeout) {
-          console.log('Connection lost and not reconnecting. Attempting to reconnect...')
           this.reconnectAttempts = 0
           this.connect()
         }

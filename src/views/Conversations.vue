@@ -269,23 +269,17 @@ export default {
     // Enrich conversations with additional data
     const enrichConversations = async () => {
       // For each conversation, we need to fetch the full details including messages
-      console.log('Enriching conversations, starting with:', conversations.value)
-
       try {
         const enrichedConversations = await Promise.all(
           conversations.value.map(async (conv) => {
             try {
               // Fetch full conversation details
-              console.log(`Fetching details for conversation ${conv.id}`)
               const details = await apiClient.getConversation(conv.id)
-              console.log(`Received details for conversation ${conv.id}:`, details)
 
               // The API returns message_ids, not the actual messages
               // We need to fetch each message individually
               let messages = []
               if (details.message_ids && details.message_ids.length > 0) {
-                console.log(`Fetching ${details.message_ids.length} messages for conversation ${conv.id}`)
-
                 // Only admins can fetch individual messages
                 if (isAdmin.value) {
                   // Fetch messages in parallel for better performance
@@ -300,22 +294,17 @@ export default {
 
                   const fetchedMessages = await Promise.all(messagePromises)
                   messages = fetchedMessages.filter(msg => msg !== null)
-                  console.log(`Fetched ${messages.length} messages for conversation ${conv.id}`)
                 } else {
                   // Non-admins can't fetch individual messages directly
                   // Try to get recent messages and filter by IDs
-                  console.log(`Non-admin user: Attempting to fetch recent messages for conversation ${conv.id}`)
-
                   try {
                     // Fetch a large batch of recent messages
                     const recentMessages = await apiClient.getMessages(500, 0)
-                    console.log(`Fetched ${recentMessages.messages?.length || 0} recent messages`)
 
                     // Filter to find messages that match our IDs
                     if (recentMessages.messages && recentMessages.messages.length > 0) {
                       const messageIdSet = new Set(details.message_ids)
                       messages = recentMessages.messages.filter(msg => messageIdSet.has(msg.id))
-                      console.log(`Found ${messages.length} matching messages for conversation`)
 
                       // Sort messages by timestamp to maintain order
                       messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
@@ -352,7 +341,6 @@ export default {
                 participants: extractParticipants(messages)
               }
 
-              console.log(`Enriched conversation ${conv.id}:`, enrichedConv)
               return enrichedConv
             } catch (error) {
               console.error(`Failed to enrich conversation ${conv.id}:`, error)
@@ -366,7 +354,6 @@ export default {
           })
         )
         conversations.value = enrichedConversations
-        console.log('Final enriched conversations:', conversations.value)
       } catch (error) {
         console.error('Failed to enrich conversations:', error)
         // Ensure all conversations have messages array

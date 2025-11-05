@@ -140,14 +140,11 @@ export default {
 
       // Adjust offset
       messageOffset.value = Math.max(0, messageOffset.value - messageIds.length)
-
-      // Show success feedback
-      console.log(`Deleted ${messageIds.length} message(s)`)
     }
 
     // Handle conversation creation
     const handleConversationCreated = (conversation) => {
-      console.log('Conversation created:', conversation)
+      // Conversation created successfully
     }
 
     onMounted(async () => {
