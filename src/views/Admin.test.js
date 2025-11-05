@@ -10,8 +10,7 @@ vi.mock('../api/client', () => ({
     inviteUserByEmail: vi.fn(),
     getAllUsersAdmin: vi.fn(),
     updateUserAdmin: vi.fn(),
-    deleteUser: vi.fn(),
-    getWebSocketConnections: vi.fn()
+    deleteUser: vi.fn()
   }
 }))
 
@@ -43,12 +42,6 @@ describe('Admin.vue - Invite Functionality', () => {
 
     // Mock getAllUsersAdmin to return empty array by default
     apiClient.getAllUsersAdmin.mockResolvedValue([])
-
-    // Mock getWebSocketConnections to return empty connections by default
-    apiClient.getWebSocketConnections.mockResolvedValue({
-      total_connections: 0,
-      connections: []
-    })
   })
 
   const createWrapper = () => {

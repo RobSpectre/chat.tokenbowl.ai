@@ -1,10 +1,17 @@
 import { defineStore } from 'pinia'
+import { Centrifuge } from 'centrifuge'
 import apiClient from '../api/client'
+
+// Connection promise to ensure only one connection attempt at a time
+let connectionPromise = null
 
 export const useWebSocketStore = defineStore('websocket', {
   state: () => ({
-    ws: null,
+    centrifuge: null,
+    roomSubscription: null,
+    userSubscription: null,
     connected: false,
+    connecting: false, // Flag to prevent concurrent connection attempts
     messages: [],
     reconnectTimeout: null,
     reconnectAttempts: 0,
@@ -23,94 +30,163 @@ export const useWebSocketStore = defineStore('websocket', {
   },
 
   actions: {
-    connect() {
+    async connect() {
+      // If already connected, return immediately
+      if (this.connected) {
+        return
+      }
+
+      // If a connection is in progress, return the existing promise
+      if (connectionPromise) {
+        return connectionPromise
+      }
+
+      // Create a new connection promise that all concurrent calls will share
+      connectionPromise = this._doConnect()
+
       try {
-        // Don't reconnect if already connected
-        if (this.ws && this.connected) {
-          console.log('WebSocket already connected')
-          return
+        await connectionPromise
+      } finally {
+        // Clear the promise after completion (success or failure)
+        connectionPromise = null
+      }
+    },
+
+    async _doConnect() {
+      // Set flag
+      this.connecting = true
+
+      try {
+        // Clean up any existing connection before creating a new one
+        if (this.centrifuge) {
+          // Don't call disconnect() as it resets the connecting flag
+          // Instead, manually cleanup
+          if (this.roomSubscription) {
+            this.roomSubscription.unsubscribe()
+            this.roomSubscription.remove()
+            this.roomSubscription = null
+          }
+          if (this.userSubscription) {
+            this.userSubscription.unsubscribe()
+            this.userSubscription.remove()
+            this.userSubscription = null
+          }
+          this.centrifuge.disconnect()
+          this.centrifuge = null
         }
 
-        this.ws = apiClient.createWebSocket()
+        // Get connection token from server
+        const connectionInfo = await apiClient.getCentrifugoConnectionToken()
+        console.log('Got Centrifugo connection token for channels:', connectionInfo.channels)
 
-        this.ws.onopen = () => {
+        // Create Centrifugo client
+        this.centrifuge = new Centrifuge(connectionInfo.url, {
+          token: connectionInfo.token
+        })
+
+        // Set up connection event handlers
+        this.centrifuge.on('connected', (ctx) => {
           this.connected = true
+          this.connecting = false
           this.reconnectAttempts = 0
-          console.log('WebSocket connected')
+          console.log('Centrifugo connected:', ctx)
 
           // Clear any pending reconnection timeout
           if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout)
             this.reconnectTimeout = null
           }
-        }
+        })
 
-        this.ws.onmessage = (event) => {
-          const message = JSON.parse(event.data)
-
-          // Handle heartbeat ping/pong
-          if (message.type === 'ping') {
-            // Respond to ping with pong to keep connection alive
-            this.ws.send(JSON.stringify({ type: 'pong' }))
-            console.log('Received ping, sent pong')
-            return
-          }
-
-          // Only add message if we don't already have this ID
-          if (message.id && !this.messages.find(m => m.id === message.id)) {
-            this.messages.push(message)
-          } else if (!message.id) {
-            // If message has no ID, add it anyway (shouldn't happen in normal operation)
-            this.messages.push(message)
-          }
-        }
-
-        this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error)
-        }
-
-        this.ws.onclose = (event) => {
+        this.centrifuge.on('disconnected', (ctx) => {
           this.connected = false
-          console.log('WebSocket disconnected:', event.code, event.reason)
+          this.connecting = false
+          console.log('Centrifugo disconnected:', ctx)
+        })
 
-          // Clear the WebSocket reference
-          this.ws = null
+        this.centrifuge.on('error', (ctx) => {
+          console.error('Centrifugo error:', ctx)
+        })
 
-          // Don't reconnect if this was an intentional close (disconnect() was called)
-          // Normal close code is 1000, abnormal closures will have different codes
-          const wasIntentional = event.code === 1000 && event.wasClean
+        // Set up subscriptions
+        for (const channel of connectionInfo.channels) {
+          console.log('Setting up subscription for', channel)
+          const subscription = this.centrifuge.newSubscription(channel)
 
-          if (!wasIntentional) {
-            // Always attempt to reconnect with exponential backoff (infinite retries)
-            const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), this.maxReconnectDelay)
+          subscription.on('publication', (ctx) => {
+            const message = ctx.data
+            console.log('Received message on', channel, ':', message)
 
-            console.log(`Reconnecting in ${delay/1000} seconds... (attempt ${this.reconnectAttempts + 1})`)
+            // Only add message if we don't already have this ID
+            if (message.id && !this.messages.find(m => m.id === message.id)) {
+              this.messages.push(message)
+            } else if (!message.id) {
+              // If message has no ID, add it anyway (shouldn't happen in normal operation)
+              this.messages.push(message)
+            }
+          })
 
-            this.reconnectTimeout = setTimeout(() => {
-              this.reconnectAttempts++
-              this.connect()
-            }, delay)
-          } else {
-            console.log('WebSocket closed intentionally, not reconnecting')
+          subscription.on('subscribed', (ctx) => {
+            console.log('Subscribed to', channel, ':', ctx)
+          })
+
+          subscription.on('error', (ctx) => {
+            // Ignore "already subscribed" errors - they're harmless
+            const errorMsg = ctx.error?.message || ctx.message || JSON.stringify(ctx)
+            if (errorMsg.includes('already subscribed')) {
+              console.log(`Channel ${channel} subscription reused (this is normal)`)
+              return
+            }
+            console.error('Subscription error on', channel, ':', ctx)
+          })
+
+          // Store subscriptions for cleanup
+          if (channel === 'room:main') {
+            this.roomSubscription = subscription
+          } else if (channel.startsWith('user:')) {
+            this.userSubscription = subscription
           }
+
+          // DO NOT call subscribe() - subscriptions auto-subscribe when connect() is called
+          // subscription.subscribe() <- This causes "already subscribed" errors!
         }
+
+        // Connect to Centrifugo - this will establish the connection and activate subscriptions
+        this.centrifuge.connect()
       } catch (error) {
-        console.error('Failed to create WebSocket:', error)
+        console.error('Failed to create Centrifugo connection:', error)
+        this.connecting = false // Reset connecting flag on error
+
+        // Retry connection with exponential backoff
+        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), this.maxReconnectDelay)
+        console.log(`Reconnecting in ${delay/1000} seconds... (attempt ${this.reconnectAttempts + 1})`)
+
+        this.reconnectTimeout = setTimeout(() => {
+          this.reconnectAttempts++
+          // Clear any stale connection promise before reconnecting
+          connectionPromise = null
+          this.connect()
+        }, delay)
       }
     },
 
-    sendMessage(content, toUsername = null) {
-      if (this.ws && this.connected) {
-        this.ws.send(JSON.stringify({
-          content,
-          to_username: toUsername
-        }))
-      } else {
-        console.warn('Cannot send message: WebSocket not connected')
+    async sendMessage(content, toUsername = null) {
+      // With Centrifugo, clients don't publish directly - they use the REST API
+      // The server will publish to Centrifugo channels
+      try {
+        await apiClient.sendMessage(content, toUsername)
+      } catch (error) {
+        console.error('Failed to send message:', error)
+        throw error
       }
     },
 
     disconnect() {
+      console.log('Disconnecting from Centrifugo...')
+
+      // Clear any pending connection promise
+      connectionPromise = null
+
       if (this.reconnectTimeout) {
         clearTimeout(this.reconnectTimeout)
         this.reconnectTimeout = null
@@ -121,16 +197,32 @@ export const useWebSocketStore = defineStore('websocket', {
         this.connectionCheckInterval = null
       }
 
-      if (this.ws) {
-        // Prevent reconnection on manual close
-        this.ws.onclose = null
-        // Close with code 1000 (normal closure) so onclose knows this was intentional
-        this.ws.close(1000, 'User disconnected')
-        this.ws = null
+      // Unsubscribe from channels
+      if (this.roomSubscription) {
+        console.log('Unsubscribing from room:main')
+        this.roomSubscription.unsubscribe()
+        this.roomSubscription.remove() // Remove subscription from Centrifuge instance
+        this.roomSubscription = null
+      }
+
+      if (this.userSubscription) {
+        console.log('Unsubscribing from user channel')
+        this.userSubscription.unsubscribe()
+        this.userSubscription.remove() // Remove subscription from Centrifuge instance
+        this.userSubscription = null
+      }
+
+      // Disconnect from Centrifugo
+      if (this.centrifuge) {
+        console.log('Disconnecting Centrifuge client')
+        this.centrifuge.disconnect()
+        this.centrifuge = null
         this.connected = false
+        this.connecting = false
       }
 
       this.reconnectAttempts = 0 // Reset attempts
+      console.log('Disconnect complete')
     },
 
     // Start periodic connection health check

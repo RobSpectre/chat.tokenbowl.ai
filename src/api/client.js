@@ -141,11 +141,6 @@ class ApiClient {
     return response.data
   }
 
-  async getWebSocketConnections() {
-    const response = await this.client.get('/admin/websocket/connections')
-    return response.data
-  }
-
   // Admin message endpoints
   async getAdminMessage(messageId) {
     const response = await this.client.get(`/admin/messages/${messageId}`)
@@ -329,19 +324,10 @@ class ApiClient {
     return response.data
   }
 
-  // WebSocket connection
-  createWebSocket() {
-    const wsUrl = import.meta.env.VITE_TOKEN_BOWL_CHAT_WS_URL || 'ws://localhost:8000'
-    const { apiKey, sessionToken } = getAuth()
-
-    // Use session token if available, otherwise use API key
-    if (sessionToken) {
-      return new WebSocket(`${wsUrl}/ws?token=${sessionToken}`)
-    } else if (apiKey) {
-      return new WebSocket(`${wsUrl}/ws?api_key=${apiKey}`)
-    } else {
-      throw new Error('No authentication credentials available')
-    }
+  // Centrifugo connection token
+  async getCentrifugoConnectionToken() {
+    const response = await this.client.get('/centrifugo/connection-token')
+    return response.data
   }
 }
 

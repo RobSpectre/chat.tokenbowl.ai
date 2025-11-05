@@ -25,90 +25,6 @@
             p.text-sm.text-gray-400 Regular Users
             p.text-2xl.font-bold.text-white {{ allUsers.filter(u => !u.bot && !u.viewer).length }}
 
-        //- WebSocket Health Monitoring
-        .card
-          .flex.flex-col.sm_flex-row.items-start.sm_items-center.justify-between.mb-4.gap-3
-            div
-              h2.text-xl.font-semibold.text-white WebSocket Connections
-              p.text-xs.text-gray-400.mt-1 Auto-refreshes every 30 seconds
-            .flex.items-center.gap-3
-              .text-sm.text-gray-400(v-if="wsLastRefresh")
-                | Last refresh: {{ formatTime(wsLastRefresh) }}
-              button.btn.btn-secondary.text-sm(
-                @click="loadWebSocketConnections"
-                :disabled="wsLoading"
-              ) {{ wsLoading ? 'Refreshing...' : 'Refresh Now' }}
-
-          .text-red-500.text-sm.mb-4(v-if="wsError") {{ wsError }}
-
-          //- Connection stats
-          .grid.grid-cols-2.gap-4.mb-4(v-if="wsConnections")
-            .bg-slate-800.rounded.p-4
-              p.text-xs.text-gray-400 Total Connections
-              p.text-2xl.font-bold.text-white {{ wsConnections.total_connections }}
-            .bg-slate-800.rounded.p-4
-              p.text-xs.text-gray-400 Healthy Connections
-              p.text-2xl.font-bold.text-green-400 {{ wsConnections.connections?.filter(c => c.is_healthy).length || 0 }}
-
-          //- No connections message
-          .text-center.py-8.text-gray-400(v-if="wsConnections && wsConnections.total_connections === 0")
-            p No active WebSocket connections
-
-          //- Connections table (desktop)
-          .hidden.lg_block.overflow-x-auto(v-if="wsConnections && wsConnections.total_connections > 0")
-            table.w-full
-              thead
-                tr.border-b.border-slate-700
-                  th.text-left.p-3.text-sm.text-gray-400 Status
-                  th.text-left.p-3.text-sm.text-gray-400 Username
-                  th.text-left.p-3.text-sm.text-gray-400 Last Activity
-                  th.text-left.p-3.text-sm.text-gray-400 Last Pong
-                  th.text-left.p-3.text-sm.text-gray-400 Idle Time
-              tbody
-                tr.border-b.border-slate-800(
-                  v-for="conn in wsConnections.connections"
-                  :key="conn.username"
-                  :class="conn.is_healthy ? 'hover:bg-slate-900' : 'bg-red-950 hover:bg-red-900'"
-                )
-                  td.p-3
-                    .flex.items-center.gap-2
-                      .w-2.h-2.rounded-full(:class="conn.is_healthy ? 'bg-green-500' : 'bg-red-500'")
-                      span.text-xs.font-medium(:class="conn.is_healthy ? 'text-green-400' : 'text-red-400'")
-                        | {{ conn.is_healthy ? 'Healthy' : 'Unhealthy' }}
-                  td.p-3
-                    p.text-sm.text-white.font-medium {{ conn.username }}
-                  td.p-3
-                    p.text-sm.text-gray-300 {{ formatTimestamp(conn.last_activity) }}
-                  td.p-3
-                    p.text-sm.text-gray-300 {{ formatTimestamp(conn.last_pong) }}
-                  td.p-3
-                    p.text-sm.text-gray-300 {{ formatSeconds(conn.seconds_since_activity) }}
-
-          //- Connections list (mobile)
-          .lg_hidden.space-y-3(v-if="wsConnections && wsConnections.total_connections > 0")
-            .rounded-lg.p-4.border(
-              v-for="conn in wsConnections.connections"
-              :key="conn.username"
-              :class="conn.is_healthy ? 'bg-slate-800 border-slate-700' : 'bg-red-950 border-red-900'"
-            )
-              .flex.items-center.justify-between.mb-3
-                .flex.items-center.gap-2
-                  .w-3.h-3.rounded-full(:class="conn.is_healthy ? 'bg-green-500' : 'bg-red-500'")
-                  p.font-medium.text-white {{ conn.username }}
-                span.text-xs.font-medium(:class="conn.is_healthy ? 'text-green-400' : 'text-red-400'")
-                  | {{ conn.is_healthy ? 'Healthy' : 'Unhealthy' }}
-
-              .space-y-2.text-sm
-                div
-                  p.text-gray-400 Last Activity
-                  p.text-gray-300 {{ formatTimestamp(conn.last_activity) }}
-                div
-                  p.text-gray-400 Last Pong
-                  p.text-gray-300 {{ formatTimestamp(conn.last_pong) }}
-                div
-                  p.text-gray-400 Idle Time
-                  p.text-gray-300 {{ formatSeconds(conn.seconds_since_activity) }}
-
         //- Invite User Form
         .card
           h2.text-xl.font-semibold.text-white.mb-4 Invite User by Email
@@ -472,13 +388,6 @@ export default {
     const botError = ref('')
     const botSuccess = ref('')
 
-    // WebSocket health monitoring state
-    const wsConnections = ref(null)
-    const wsLoading = ref(false)
-    const wsError = ref('')
-    const wsLastRefresh = ref(null)
-    let wsPollingInterval = null
-
     const sortedUsers = computed(() => {
       return [...allUsers.value].sort((a, b) => {
         // Sort by admin first, then bots, then regular users
@@ -656,39 +565,6 @@ export default {
       return `${minutes}m ${remainingSeconds}s`
     }
 
-    const loadWebSocketConnections = async () => {
-      wsLoading.value = true
-      wsError.value = ''
-
-      try {
-        const data = await apiClient.getWebSocketConnections()
-        wsConnections.value = data
-        wsLastRefresh.value = new Date()
-      } catch (err) {
-        wsError.value = err.response?.data?.detail || 'Failed to load WebSocket connections'
-        console.error('Failed to load WebSocket connections:', err)
-      } finally {
-        wsLoading.value = false
-      }
-    }
-
-    const startWebSocketPolling = () => {
-      // Load immediately
-      loadWebSocketConnections()
-
-      // Then poll every 30 seconds
-      wsPollingInterval = setInterval(() => {
-        loadWebSocketConnections()
-      }, 30000) // 30 seconds
-    }
-
-    const stopWebSocketPolling = () => {
-      if (wsPollingInterval) {
-        clearInterval(wsPollingInterval)
-        wsPollingInterval = null
-      }
-    }
-
     const handleInviteUser = async () => {
       inviting.value = true
       inviteError.value = ''
@@ -759,11 +635,6 @@ export default {
     onMounted(async () => {
       await loadUsers()
       await usersStore.loadAvailableLogos()
-      startWebSocketPolling()
-    })
-
-    onUnmounted(() => {
-      stopWebSocketPolling()
     })
 
     return {
@@ -789,10 +660,6 @@ export default {
       creatingBot,
       botError,
       botSuccess,
-      wsConnections,
-      wsLoading,
-      wsError,
-      wsLastRefresh,
       loadUsers,
       startEditUser,
       cancelEdit,
@@ -803,8 +670,7 @@ export default {
       formatDate,
       formatTime,
       formatTimestamp,
-      formatSeconds,
-      loadWebSocketConnections
+      formatSeconds
     }
   }
 }
