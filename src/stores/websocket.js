@@ -15,8 +15,7 @@ export const useWebSocketStore = defineStore('websocket', {
     messages: [],
     reconnectTimeout: null,
     reconnectAttempts: 0,
-    maxReconnectDelay: 30000, // Cap at 30 seconds for better responsiveness
-    connectionCheckInterval: null
+    maxReconnectDelay: 30000 // Cap at 30 seconds for better responsiveness
   }),
 
   getters: {
@@ -112,6 +111,13 @@ export const useWebSocketStore = defineStore('websocket', {
           subscription.on('publication', (ctx) => {
             const message = ctx.data
 
+            // Skip read receipts - they should be handled separately
+            if (message.type === 'read_receipt') {
+              // Could emit a separate event for read receipts if needed
+              console.debug('WebSocket: Received read receipt for message', message.message_id)
+              return
+            }
+
             // Only add message if we don't already have this ID
             if (message.id && !this.messages.find(m => m.id === message.id)) {
               this.messages.push(message)
@@ -183,11 +189,6 @@ export const useWebSocketStore = defineStore('websocket', {
         this.reconnectTimeout = null
       }
 
-      if (this.connectionCheckInterval) {
-        clearInterval(this.connectionCheckInterval)
-        this.connectionCheckInterval = null
-      }
-
       // Unsubscribe from channels
       if (this.roomSubscription) {
         this.roomSubscription.unsubscribe()
@@ -210,20 +211,6 @@ export const useWebSocketStore = defineStore('websocket', {
       }
 
       this.reconnectAttempts = 0 // Reset attempts
-    },
-
-    // Start periodic connection health check
-    startConnectionHealthCheck() {
-      if (this.connectionCheckInterval) {
-        clearInterval(this.connectionCheckInterval)
-      }
-
-      this.connectionCheckInterval = setInterval(() => {
-        if (!this.connected && !this.reconnectTimeout) {
-          this.reconnectAttempts = 0
-          this.connect()
-        }
-      }, 10000) // Check every 10 seconds
     },
 
     clearMessages() {

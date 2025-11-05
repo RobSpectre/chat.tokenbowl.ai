@@ -157,12 +157,6 @@ export default {
       // Connect to WebSocket for real-time updates
       connect()
 
-      // Start connection health check
-      const wsStore = useWebSocket()
-      if (wsStore.startConnectionHealthCheck) {
-        wsStore.startConnectionHealthCheck()
-      }
-
       // Poll for online users every 30 seconds
       userPollInterval = setInterval(() => usersStore.loadUsers(), 30000)
     })
@@ -178,16 +172,45 @@ export default {
       if (newMessages.length > 0) {
         const latestMessage = newMessages[newMessages.length - 1]
 
-        // Only process room messages (public chat)
-        if (!latestMessage.message_type || latestMessage.message_type === 'room') {
-          // Set default status to 'delivered' for messages from server
-          if (!latestMessage.status) {
-            latestMessage.status = 'delivered'
-          }
+        // Skip read receipts and other non-chat message types
+        if (latestMessage.type === 'read_receipt') {
+          // Could handle read receipts here if needed for UI updates
+          console.debug('Received read receipt:', {
+            messageId: latestMessage.message_id,
+            readBy: latestMessage.read_by,
+            readAt: latestMessage.read_at
+          })
+          return
+        }
 
-          messagesStore.addPublicMessage(latestMessage)
-          // Increment offset when new messages arrive via WebSocket
-          messageOffset.value++
+        // Skip presence updates or other non-chat types
+        if (latestMessage.type && latestMessage.type !== 'message' && latestMessage.type !== 'chat') {
+          console.debug('Received non-chat message type:', latestMessage.type)
+          return
+        }
+
+        // Only process room messages (public chat) that have required fields
+        if (!latestMessage.message_type || latestMessage.message_type === 'room') {
+          // Validate message has required fields before processing
+          if (latestMessage.from_username && latestMessage.content !== undefined) {
+            // Set default status to 'delivered' for messages from server
+            if (!latestMessage.status) {
+              latestMessage.status = 'delivered'
+            }
+
+            messagesStore.addPublicMessage(latestMessage)
+            // Increment offset when new messages arrive via WebSocket
+            messageOffset.value++
+          } else {
+            // Log incomplete message for debugging but don't process it
+            console.debug('Received incomplete chat message from WebSocket:', {
+              hasFromUsername: !!latestMessage.from_username,
+              hasContent: latestMessage.content !== undefined,
+              messageType: latestMessage.message_type,
+              type: latestMessage.type,
+              keys: Object.keys(latestMessage)
+            })
+          }
         }
       }
     }, { deep: true })

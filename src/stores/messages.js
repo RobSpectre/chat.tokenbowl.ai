@@ -104,7 +104,15 @@ export const useMessagesStore = defineStore('messages', {
     async addPublicMessage(message) {
       // Skip messages with missing critical fields
       if (!message || !message.from_username || message.content === undefined) {
-        console.warn('Skipping message with missing fields:', message)
+        // Only log if it's not a system/presence message or other expected non-chat message types
+        if (message && (message.message_type === 'room' || message.message_type === 'public' || !message.message_type)) {
+          console.warn('Skipping incomplete chat message:', {
+            hasFromUsername: !!message?.from_username,
+            hasContent: message?.content !== undefined,
+            messageType: message?.message_type,
+            keys: message ? Object.keys(message) : []
+          })
+        }
         return
       }
 
