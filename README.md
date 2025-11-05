@@ -35,26 +35,15 @@ A modern, real-time chat application built with Vue 3, designed to work with the
 npm install
 ```
 
-2. Create environment file:
-```bash
-cp .env.example .env
-```
-
-3. Update `.env` for your environment:
+2. Configuration:
 
 **For local development:**
-```env
-VITE_TOKEN_BOWL_CHAT_API_URL=http://localhost:8000
-VITE_TOKEN_BOWL_CHAT_WS_URL=ws://localhost:8000
-```
 
-**For production (GitHub Pages):**
+The app defaults to `http://localhost:8000` for the chat server. No configuration needed!
 
-Update `.env.production` with your deployed chat server URLs:
-```env
-VITE_TOKEN_BOWL_CHAT_API_URL=https://your-chat-server.com
-VITE_TOKEN_BOWL_CHAT_WS_URL=wss://your-chat-server.com
-```
+**For production deployment:**
+
+Configuration is handled via GitHub Secrets (see Deployment section below).
 
 ## Development
 
@@ -105,14 +94,12 @@ The site will be automatically built and deployed to `https://yourusername.githu
 
 ### Manual Deployment
 
-1. Update `.env.production` with your production URLs
-
-2. Build the project:
+1. Set environment variables and build the project:
    ```bash
-   npm run build
+   VITE_TOKEN_BOWL_CHAT_API_URL=https://your-server.com npm run build
    ```
 
-3. Deploy the `dist` folder to GitHub Pages using your preferred method (gh-pages, manual upload, etc.)
+2. Deploy the `dist` folder to GitHub Pages using your preferred method (gh-pages, manual upload, etc.)
 
 ### CORS Configuration
 
@@ -246,12 +233,12 @@ The app integrates with the Token Bowl Chat Server API:
 ### Environment Variables
 
 - `VITE_TOKEN_BOWL_CHAT_API_URL`: Backend API URL (default: `http://localhost:8000`)
-- `VITE_TOKEN_BOWL_CHAT_WS_URL`: WebSocket URL (default: `ws://localhost:8000`)
+- `VITE_TOKEN_BOWL_CHAT_WS_URL`: WebSocket URL (legacy, not actively used)
 
-These are configured in:
-- `.env` - Local development (git-ignored)
-- `.env.production` - Production build defaults
-- GitHub Secrets - Production deployment (overrides .env.production)
+These are configured via:
+- **Local Development**: Defaults to `http://localhost:8000` (no configuration needed)
+- **GitHub Actions Deployment**: GitHub Secrets (see Deployment section)
+- **Manual Builds**: Set environment variables before running `npm run build`
 
 ## Troubleshooting
 
