@@ -280,56 +280,18 @@ export default {
               // We need to fetch each message individually
               let messages = []
               if (details.message_ids && details.message_ids.length > 0) {
-                // Only admins can fetch individual messages
-                if (isAdmin.value) {
-                  // Fetch messages in parallel for better performance
-                  const messagePromises = details.message_ids.map(async (messageId) => {
-                    try {
-                      return await apiClient.getAdminMessage(messageId)
-                    } catch (error) {
-                      console.error(`Failed to fetch message ${messageId}:`, error)
-                      return null
-                    }
-                  })
-
-                  const fetchedMessages = await Promise.all(messagePromises)
-                  messages = fetchedMessages.filter(msg => msg !== null)
-                } else {
-                  // Non-admins can't fetch individual messages directly
-                  // Try to get recent messages and filter by IDs
+                // Fetch messages in parallel for better performance
+                const messagePromises = details.message_ids.map(async (messageId) => {
                   try {
-                    // Fetch a large batch of recent messages
-                    const recentMessages = await apiClient.getMessages(500, 0)
-
-                    // Filter to find messages that match our IDs
-                    if (recentMessages.messages && recentMessages.messages.length > 0) {
-                      const messageIdSet = new Set(details.message_ids)
-                      messages = recentMessages.messages.filter(msg => messageIdSet.has(msg.id))
-
-                      // Sort messages by timestamp to maintain order
-                      messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-                    }
-
-                    // If we couldn't find the messages, show a placeholder
-                    if (messages.length === 0) {
-                      messages = [{
-                        id: 'placeholder',
-                        content: `This conversation contains ${details.message_ids?.length || 0} messages. Full content may not be available.`,
-                        from_username: 'System',
-                        timestamp: new Date().toISOString()
-                      }]
-                    }
+                    return await apiClient.getMessage(messageId)
                   } catch (error) {
-                    console.error('Failed to fetch recent messages:', error)
-                    // Fallback to placeholder
-                    messages = [{
-                      id: 'placeholder',
-                      content: 'Unable to load conversation messages.',
-                      from_username: 'System',
-                      timestamp: new Date().toISOString()
-                    }]
+                    console.error(`Failed to fetch message ${messageId}:`, error)
+                    return null
                   }
-                }
+                })
+
+                const fetchedMessages = await Promise.all(messagePromises)
+                messages = fetchedMessages.filter(msg => msg !== null)
               }
 
               const enrichedConv = {
