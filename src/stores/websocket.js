@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { Centrifuge } from 'centrifuge'
 import apiClient from '../api/client'
+import { useUsersStore } from './users'
 
 // Connection promise to ensure only one connection attempt at a time
 let connectionPromise = null
@@ -84,6 +85,7 @@ export const useWebSocketStore = defineStore('websocket', {
 
         // Set up connection event handlers
         this.centrifuge.on('connected', (ctx) => {
+          console.log('WebSocket: Connected to Centrifugo')
           this.connected = true
           this.connecting = false
           this.reconnectAttempts = 0
@@ -118,17 +120,63 @@ export const useWebSocketStore = defineStore('websocket', {
               return
             }
 
+            // Log the incoming message for debugging
+            console.log('WebSocket: Received publication on channel', channel, ':', message)
+
             // Only add message if we don't already have this ID
             if (message.id && !this.messages.find(m => m.id === message.id)) {
-              this.messages.push(message)
+              // Use array mutation method to ensure reactivity
+              this.messages = [...this.messages, message]
+              console.log('WebSocket: Added message to store, total messages:', this.messages.length)
             } else if (!message.id) {
               // If message has no ID, add it anyway (shouldn't happen in normal operation)
-              this.messages.push(message)
+              this.messages = [...this.messages, message]
+              console.log('WebSocket: Added message without ID to store')
             }
           })
 
           subscription.on('subscribed', (ctx) => {
             // Subscription successful
+            console.log(`WebSocket: Successfully subscribed to channel ${channel}`)
+
+            // Get initial presence state for room channel
+            if (channel === 'room:main') {
+              subscription.presence().then((ctx) => {
+                const presentUsers = Object.keys(ctx.presence || {}).map(clientId => {
+                  const info = ctx.presence[clientId]
+                  return info.user || clientId
+                })
+
+                // Update online users in users store
+                const usersStore = useUsersStore()
+                usersStore.onlineUsers = presentUsers
+                console.log(`WebSocket: Initial presence for ${channel}:`, presentUsers.length, 'users online')
+              }).catch((err) => {
+                console.warn('WebSocket: Failed to get presence:', err)
+              })
+            }
+          })
+
+          subscription.on('join', (ctx) => {
+            // User joined the channel
+            const username = ctx.info.user
+            if (username && channel === 'room:main') {
+              const usersStore = useUsersStore()
+              if (!usersStore.onlineUsers.includes(username)) {
+                usersStore.onlineUsers = [...usersStore.onlineUsers, username]
+                console.log(`WebSocket: User joined: ${username}`)
+              }
+            }
+          })
+
+          subscription.on('leave', (ctx) => {
+            // User left the channel
+            const username = ctx.info.user
+            if (username && channel === 'room:main') {
+              const usersStore = useUsersStore()
+              usersStore.onlineUsers = usersStore.onlineUsers.filter(u => u !== username)
+              console.log(`WebSocket: User left: ${username}`)
+            }
           })
 
           subscription.on('error', (ctx) => {
@@ -146,9 +194,6 @@ export const useWebSocketStore = defineStore('websocket', {
           } else if (channel.startsWith('user:')) {
             this.userSubscription = subscription
           }
-
-          // DO NOT call subscribe() - subscriptions auto-subscribe when connect() is called
-          // subscription.subscribe() <- This causes "already subscribed" errors!
         }
 
         // Connect to Centrifugo - this will establish the connection and activate subscriptions

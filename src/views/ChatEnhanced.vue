@@ -6,6 +6,9 @@
     :isConnected="connected"
   )
 
+  //- WebSocket Debug Component
+  WebSocketDebug
+
   //- Main Content
   .flex-1.flex.overflow-hidden
     //- Sidebar - Online Users
@@ -63,12 +66,14 @@ import { useAuth } from '../composables/useAuth'
 import { useWebSocket } from '../composables/useWebSocket'
 import TopNav from '../components/TopNav.vue'
 import ChatMessagesEnhanced from '../components/ChatMessagesEnhanced.vue'
+import WebSocketDebug from '../components/WebSocketDebug.vue'
 
 export default {
   name: 'ChatEnhanced',
   components: {
     TopNav,
-    ChatMessagesEnhanced
+    ChatMessagesEnhanced,
+    WebSocketDebug
   },
   setup() {
     const router = useRouter()
@@ -167,53 +172,69 @@ export default {
       }
     })
 
+    // Keep track of processed message IDs to avoid duplicates
+    const processedMessageIds = ref(new Set())
+
     // Watch for new WebSocket messages
-    watch(wsMessages, (newMessages) => {
-      if (newMessages.length > 0) {
-        const latestMessage = newMessages[newMessages.length - 1]
+    watch(wsMessages, (newMessages, oldMessages) => {
+      // Process all messages that haven't been processed yet
+      newMessages.forEach(message => {
+        // Skip if we've already processed this message
+        if (message.id && processedMessageIds.value.has(message.id)) {
+          return
+        }
 
         // Skip read receipts and other non-chat message types
-        if (latestMessage.type === 'read_receipt') {
+        if (message.type === 'read_receipt') {
           // Could handle read receipts here if needed for UI updates
           console.debug('Received read receipt:', {
-            messageId: latestMessage.message_id,
-            readBy: latestMessage.read_by,
-            readAt: latestMessage.read_at
+            messageId: message.message_id,
+            readBy: message.read_by,
+            readAt: message.read_at
           })
+          if (message.id) processedMessageIds.value.add(message.id)
           return
         }
 
         // Skip presence updates or other non-chat types
-        if (latestMessage.type && latestMessage.type !== 'message' && latestMessage.type !== 'chat') {
-          console.debug('Received non-chat message type:', latestMessage.type)
+        if (message.type && message.type !== 'message' && message.type !== 'chat') {
+          console.debug('Received non-chat message type:', message.type)
+          if (message.id) processedMessageIds.value.add(message.id)
           return
         }
 
+        // Log the message for debugging
+        console.log('ChatEnhanced: Processing WebSocket message:', message)
+
         // Only process room messages (public chat) that have required fields
-        if (!latestMessage.message_type || latestMessage.message_type === 'room') {
+        if (!message.message_type || message.message_type === 'room') {
           // Validate message has required fields before processing
-          if (latestMessage.from_username && latestMessage.content !== undefined) {
+          if (message.from_username && message.content !== undefined) {
             // Set default status to 'delivered' for messages from server
-            if (!latestMessage.status) {
-              latestMessage.status = 'delivered'
+            if (!message.status) {
+              message.status = 'delivered'
             }
 
-            messagesStore.addPublicMessage(latestMessage)
+            messagesStore.addPublicMessage(message)
+            // Mark as processed
+            if (message.id) processedMessageIds.value.add(message.id)
             // Increment offset when new messages arrive via WebSocket
             messageOffset.value++
+            console.log('ChatEnhanced: Added message to store')
           } else {
             // Log incomplete message for debugging but don't process it
             console.debug('Received incomplete chat message from WebSocket:', {
-              hasFromUsername: !!latestMessage.from_username,
-              hasContent: latestMessage.content !== undefined,
-              messageType: latestMessage.message_type,
-              type: latestMessage.type,
-              keys: Object.keys(latestMessage)
+              hasFromUsername: !!message.from_username,
+              hasContent: message.content !== undefined,
+              messageType: message.message_type,
+              type: message.type,
+              keys: Object.keys(message)
             })
+            if (message.id) processedMessageIds.value.add(message.id)
           }
         }
-      }
-    }, { deep: true })
+      })
+    }, { deep: true, immediate: true })
 
     const sendMessage = async () => {
       if (!newMessage.value.trim() || !connected.value) return

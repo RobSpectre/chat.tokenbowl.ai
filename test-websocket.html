@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
+        #status { margin-bottom: 20px; }
+        #log { background: #000; padding: 10px; height: 400px; overflow-y: auto; border: 1px solid #333; }
+        .connected { color: #0f0; }
+        .disconnected { color: #f00; }
+        .error { color: #f00; }
+        .message { color: #0ff; }
+        .publication { color: #ff0; }
+    </style>
+</head>
+<body>
+    <h1>Token Bowl Chat WebSocket Test</h1>
+    <div id="status">Status: <span id="statusText" class="disconnected">Not Connected</span></div>
+    <div id="log"></div>
+
+    <script type="module">
+        import { Centrifuge } from 'https://unpkg.com/centrifuge@5.2.2/build/index.js';
+
+        const apiUrl = 'http://localhost:8000';
+        const apiKey = localStorage.getItem('token_bowl_api_key');
+        const logDiv = document.getElementById('log');
+        const statusText = document.getElementById('statusText');
+
+        function log(message, className = '') {
+            const entry = document.createElement('div');
+            entry.className = className;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        async function test() {
+            if (!apiKey) {
+                log('No API key found in localStorage', 'error');
+                return;
+            }
+
+            log('Fetching connection token...');
+
+            try {
+                const response = await fetch(`${apiUrl}/api/centrifugo/connection`, {
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const connectionInfo = await response.json();
+                log(`Got connection info: ${connectionInfo.channels.length} channels`);
+
+                const centrifuge = new Centrifuge(connectionInfo.url, {
+                    token: connectionInfo.token
+                });
+
+                centrifuge.on('connected', (ctx) => {
+                    log('Connected to Centrifugo!', 'connected');
+                    statusText.textContent = 'Connected';
+                    statusText.className = 'connected';
+                });
+
+                centrifuge.on('disconnected', (ctx) => {
+                    log('Disconnected from Centrifugo', 'disconnected');
+                    statusText.textContent = 'Disconnected';
+                    statusText.className = 'disconnected';
+                });
+
+                centrifuge.on('error', (ctx) => {
+                    log(`Error: ${JSON.stringify(ctx)}`, 'error');
+                });
+
+                // Set up subscriptions
+                for (const channel of connectionInfo.channels) {
+                    log(`Setting up subscription for channel: ${channel}`);
+                    const subscription = centrifuge.newSubscription(channel);
+
+                    subscription.on('publication', (ctx) => {
+                        log(`Publication on ${channel}: ${JSON.stringify(ctx.data)}`, 'publication');
+                    });
+
+                    subscription.on('subscribed', (ctx) => {
+                        log(`Subscribed to channel: ${channel}`, 'message');
+                    });
+
+                    subscription.on('error', (ctx) => {
+                        log(`Subscription error on ${channel}: ${JSON.stringify(ctx)}`, 'error');
+                    });
+                }
+
+                log('Connecting...');
+                centrifuge.connect();
+
+            } catch (error) {
+                log(`Failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Run the test
+        test();
+    </script>
+</body>
+</html>

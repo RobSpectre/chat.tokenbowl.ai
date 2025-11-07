@@ -318,6 +318,24 @@
                   )
                   span.text-sm.text-gray-300 Viewer
 
+              //- API Key Section
+              .border-t.border-slate-700.pt-4.mt-4
+                .flex.flex-col.sm_flex-row.items-start.sm_items-center.justify-between.gap-3
+                  div
+                    h4.text-sm.font-semibold.text-gray-300.mb-1 API Key
+                    p.text-xs.text-gray-500 Generate a new API key for this user
+                  button.btn.btn-secondary.text-sm.w-full.sm_w-auto(
+                    type="button"
+                    @click="handleRegenerateApiKey"
+                    :disabled="regeneratingApiKey"
+                  ) {{ regeneratingApiKey ? 'Regenerating...' : 'Regenerate API Key' }}
+
+                .bg-slate-800.rounded.p-3.mt-3(v-if="newApiKey")
+                  p.text-xs.text-gray-400.mb-2 New API Key (save this now - it won't be shown again):
+                  .flex.items-center.gap-2
+                    code.text-xs.text-green-400.font-mono.break-all.flex-1 {{ newApiKey }}
+                    button.btn.btn-secondary.text-xs.px-2.py-1(@click="copyApiKey") Copy
+
               .flex.flex-col.sm_flex-row.justify-end.gap-3.mt-6
                 button.btn.btn-secondary.w-full.sm_w-auto(
                   type="button"
@@ -367,6 +385,8 @@ export default {
     const editError = ref('')
     const editSuccess = ref(false)
     const deleting = ref(null)
+    const regeneratingApiKey = ref(false)
+    const newApiKey = ref('')
 
     // Invite form state
     const inviteForm = ref({
@@ -446,6 +466,8 @@ export default {
       }
       editError.value = ''
       editSuccess.value = false
+      regeneratingApiKey.value = false
+      newApiKey.value = ''
     }
 
     const handleUpdateUser = async () => {
@@ -521,6 +543,41 @@ export default {
         error.value = err.response?.data?.detail || 'Failed to delete user'
       } finally {
         deleting.value = null
+      }
+    }
+
+    const handleRegenerateApiKey = async () => {
+      if (!selectedUser.value) return
+
+      if (!confirm(`Are you sure you want to regenerate the API key for "${selectedUser.value.username}"? Their current API key will stop working immediately.`)) {
+        return
+      }
+
+      regeneratingApiKey.value = true
+      editError.value = ''
+      newApiKey.value = ''
+
+      try {
+        const response = await apiClient.regenerateUserApiKeyAdmin(selectedUser.value.id)
+        newApiKey.value = response.api_key
+
+        // Reload users to get the updated data
+        await loadUsers()
+      } catch (err) {
+        editError.value = err.response?.data?.detail || 'Failed to regenerate API key'
+      } finally {
+        regeneratingApiKey.value = false
+      }
+    }
+
+    const copyApiKey = async () => {
+      try {
+        await navigator.clipboard.writeText(newApiKey.value)
+        // Could add a toast notification here
+        alert('API key copied to clipboard!')
+      } catch (err) {
+        console.error('Failed to copy API key:', err)
+        alert('Failed to copy API key')
       }
     }
 
@@ -651,6 +708,8 @@ export default {
       editError,
       editSuccess,
       deleting,
+      regeneratingApiKey,
+      newApiKey,
       availableLogos,
       inviteForm,
       inviting,
@@ -665,6 +724,8 @@ export default {
       cancelEdit,
       handleUpdateUser,
       handleDeleteUser,
+      handleRegenerateApiKey,
+      copyApiKey,
       handleInviteUser,
       handleCreateBot,
       formatDate,

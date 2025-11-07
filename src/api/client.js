@@ -141,6 +141,11 @@ class ApiClient {
     return response.data
   }
 
+  async regenerateUserApiKeyAdmin(userId) {
+    const response = await this.client.post(`/admin/users/${userId}/regenerate-api-key`)
+    return response.data
+  }
+
   async getMessage(messageId) {
     const response = await this.client.get(`/messages/${messageId}`)
     return response.data
@@ -331,8 +336,17 @@ class ApiClient {
 
   // Centrifugo connection token
   async getCentrifugoConnectionToken() {
-    const response = await this.client.get('/centrifugo/connection-token')
-    return response.data
+    // Use fetch directly to avoid the /api prefix that axios adds
+    const { apiKey, sessionToken } = getAuth()
+    const response = await fetch(`${API_BASE_URL}/centrifugo/connection-token`, {
+      headers: {
+        'X-API-Key': apiKey || sessionToken
+      }
+    })
+    if (!response.ok) {
+      throw new Error(`Failed to get connection token: ${response.status}`)
+    }
+    return response.json()
   }
 }
 
